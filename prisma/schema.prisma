@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Swap provider to "postgresql" and update DATABASE_URL for production.
+
+model SavedJob {
+  id        String   @id @default(cuid())
+  jobId     String
+  userId    String   @default("anonymous")
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model SavedPlace {
+  id        String   @id @default(cuid())
+  userId    String   @default("anonymous")
+  name      String
+  address   String
+  type      String
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now())
+}
+
+model SavedCommute {
+  id              String   @id @default(cuid())
+  userId          String   @default("anonymous")
+  name            String
+  originAddress   String
+  originLat       Float
+  originLng       Float
+  destAddress     String
+  destLat         Float
+  destLng         Float
+  arriveBy        String?
+  preferences     String?
+  createdAt       DateTime @default(now())
+}
+
+model UserPreference {
+  id                  String  @id @default(cuid())
+  userId              String  @unique @default("anonymous")
+  darkMode            Boolean @default(false)
+  wheelchairAccessible Boolean @default(false)
+  maxCommuteMinutes   Int     @default(45)
+  maxTransfers        Int     @default(2)
+  transitOnly         Boolean @default(false)
+}

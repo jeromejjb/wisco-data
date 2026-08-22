@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wisconsin Workways
 
-## Getting Started
+Premium civic-tech platform for Wisconsin jobs, live economic data, and transit-accessible opportunity.
 
-First, run the development server:
+## Live data sources
+
+| Domain | Source | Auth |
+|--------|--------|------|
+| **Economy** | BLS LAUS, CES, QCEW | Optional `BLS_REGISTRATION_KEY` |
+| **County unemployment** | Wisconsin DWD WisConomy (all 72 counties) | None |
+| **Income / population** | Census ACS 5-Year | `CENSUS_API_KEY` |
+| **Labor force** | FRED | `FRED_API_KEY` |
+| **Transit** | MCTS & Madison Metro GTFS static | None |
+| **Service alerts** | Madison Metro GTFS-Realtime | None |
+| **Jobs** | USAJobs, Adzuna | `USAJOBS_AUTH_KEY`, Adzuna keys |
+
+## Run locally
 
 ```bash
+npm install
+cp .env.example .env
+npx prisma migrate dev
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Economy and transit work **without API keys**. Add keys to `.env` for Census enrichment, FRED labor-force data, and live job listings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Recommended free API keys
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **BLS** — https://data.bls.gov/registrationEngine/
+2. **Census** — https://api.census.gov/data/key_signup.html
+3. **FRED** — https://fredaccount.stlouisfed.org/apikeys
+4. **USAJobs** — https://developer.usajobs.gov/apirequest/
+5. **Adzuna** — https://developer.adzuna.com/signup
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+Client pages (SWR) → /api/economy | /api/jobs | /api/transit
+  → src/services/live/* → src/services/clients/* → External APIs
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Server-side caching with TTL (`src/lib/cache.ts`)
+- Commute estimates from GTFS stop proximity
+- Provenance metadata on every API response
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Pages
 
-## Deploy on Vercel
+- `/` — Live statewide dashboard
+- `/explore` — BLS trends, QCEW industry treemap, county comparison
+- `/jobs` — Live jobs + GTFS commute enrichment
+- `/transit` — GTFS stop inventory, Madison RT alerts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Disclaimer
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Commute times are estimates from scheduled GTFS data. Not an official Wisconsin state service.

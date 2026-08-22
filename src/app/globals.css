@@ -1,26 +1,513 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f5f2;
+  --foreground: #0c1222;
+  --card: #ffffff;
+  --card-foreground: #0c1222;
+  --muted: #ece8e2;
+  --muted-foreground: #5a6278;
+  --border: #ddd8d0;
+  --ring: #1e6b9c;
+  --lake-50: #eef6fc;
+  --lake-100: #d4eaf6;
+  --lake-400: #4da3d4;
+  --lake-600: #1e6b9c;
+  --lake-700: #185580;
+  --navy-800: #141f38;
+  --navy-900: #0c1222;
+  --forest-600: #267a55;
+  --forest-700: #1e6345;
+  --cream: #f7f5f2;
+  --accent-500: #d4824a;
+  --accent-600: #b86832;
+  --success: #267a55;
+  --warning: #b7791f;
+  --danger: #c53030;
+  --glow-lake: rgba(30, 107, 156, 0.15);
+  --glow-forest: rgba(38, 122, 85, 0.12);
+}
+
+.dark {
+  --background: #070b14;
+  --foreground: #eef2f7;
+  --card: #0f1524;
+  --card-foreground: #eef2f7;
+  --muted: #161d2e;
+  --muted-foreground: #8b95a8;
+  --border: #242d42;
+  --ring: #4da3d4;
+  --glow-lake: rgba(77, 163, 212, 0.12);
+  --glow-forest: rgba(38, 122, 85, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-lake-50: var(--lake-50);
+  --color-lake-100: var(--lake-100);
+  --color-lake-400: var(--lake-400);
+  --color-lake-600: var(--lake-600);
+  --color-lake-700: var(--lake-700);
+  --color-navy-800: var(--navy-800);
+  --color-navy-900: var(--navy-900);
+  --color-forest-600: var(--forest-600);
+  --color-forest-700: var(--forest-700);
+  --color-cream: var(--cream);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-instrument);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Premium surfaces */
+.glass-panel {
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  box-shadow:
+    0 1px 2px rgba(12, 18, 34, 0.04),
+    0 8px 32px rgba(12, 18, 34, 0.06);
+}
+
+.dark .glass-panel {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.mesh-hero {
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 20%, var(--glow-lake), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 10%, var(--glow-forest), transparent 45%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, color-mix(in srgb, var(--accent-500) 8%, transparent), transparent 50%),
+    var(--background);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 40%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.stat-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-glow::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(circle, var(--glow-lake) 0%, transparent 70%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.92); }
+}
+
+.live-dot {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib,
+.maplibregl-ctrl-logo,
+.maplibregl-ctrl-attrib {
+  opacity: 0.45;
+}
+
+.maplibregl-popup.workways-county-popup .mapboxgl-popup-content,
+.maplibregl-popup.workways-county-popup .maplibregl-popup-content {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(12, 18, 34, 0.92);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.maplibregl-popup.workways-county-popup .maplibregl-popup-tip {
+  border-top-color: rgba(12, 18, 34, 0.92);
+}
+
+/* Agent workspace */
+.workspace-shell {
+  background:
+    radial-gradient(ellipse 100% 80% at 50% -20%, var(--glow-lake), transparent 55%),
+    var(--background);
+}
+
+.agent-panel {
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+}
+
+.agent-orb {
+  background: linear-gradient(135deg, var(--lake-600), var(--forest-600));
+  box-shadow:
+    0 4px 20px rgba(30, 107, 156, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.map-frame {
+  background: var(--navy-900);
+}
+
+.map-vignette {
+  box-shadow: inset 0 0 80px rgba(12, 18, 34, 0.25);
+}
+
+.dark .map-vignette {
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.45);
+}
+
+/* AI search bar */
+.ai-search-focused input {
+  border-color: color-mix(in srgb, var(--lake-600) 50%, transparent);
+  box-shadow: 0 0 0 3px var(--glow-lake);
+}
+
+/* Map markers */
+.map-marker {
+  width: 20px;
+  height: 20px;
+  transition: transform 0.2s ease;
+}
+
+.map-marker:hover {
+  transform: scale(1.15);
+  z-index: 10;
+}
+
+.map-marker-ring {
+  opacity: 0.35;
+  transform: scale(2);
+  filter: blur(4px);
+}
+
+.map-marker-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.map-marker-label {
+  pointer-events: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  border-radius: 8px;
+  background: rgba(12, 18, 34, 0.92);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.15s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.map-marker:hover .map-marker-label {
+  opacity: 1;
+}
+
+.mapboxgl-popup.workways-popup .mapboxgl-popup-content {
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(12, 18, 34, 0.2);
+}
+
+.mapboxgl-popup.workways-popup .mapboxgl-popup-close-button {
+  font-size: 16px;
+  padding: 4px 8px;
+}
+
+.workways-county-popup .county-popup-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.workways-county-popup .county-popup-value {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--lake-600, #1e6b9c);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Immersive home map — map + chat widget only */
+.map-canvas--immersive .maplibregl-canvas {
+  cursor: grab;
+}
+.map-canvas--immersive .maplibregl-canvas:active {
+  cursor: grabbing;
+}
+.map-canvas--immersive .maplibregl-ctrl-bottom-right {
+  margin: 0 12px 120px 0;
+}
+.map-canvas--immersive .maplibregl-ctrl-attrib {
+  opacity: 0.4;
+  font-size: 9px;
+  margin: 0 0 100px 8px;
+}
+.map-canvas--immersive .maplibregl-ctrl-attrib:hover {
+  opacity: 0.85;
+}
+
+.map-canvas--painted::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: radial-gradient(
+    ellipse 85% 70% at 50% 45%,
+    transparent 40%,
+    rgba(12, 18, 34, 0.12) 100%
+  );
+}
+
+.map-canvas--pulse::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  animation: map-paint-flash 1.6s ease-out forwards;
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(34, 211, 238, 0.28) 0%,
+    rgba(30, 107, 156, 0.08) 45%,
+    transparent 70%
+  );
+}
+
+/* Geographic answer pin (Option C) */
+.workways-answer-pin {
+  width: 28px;
+  height: 28px;
+  cursor: default;
+}
+.workways-answer-pin-dot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 6px auto;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22d3ee, #1e6b9c);
+  box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.35), 0 4px 12px rgba(12, 18, 34, 0.35);
+  animation: answer-pin-pulse 2s ease-in-out infinite;
+}
+@keyframes answer-pin-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.35), 0 4px 12px rgba(12, 18, 34, 0.35);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 12px rgba(34, 211, 238, 0.12), 0 4px 16px rgba(12, 18, 34, 0.4);
+  }
+}
+.mapboxgl-popup.workways-answer-pin-popup .mapboxgl-popup-content,
+.maplibregl-popup.workways-answer-pin-popup .maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workways-answer-pin-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(12, 18, 34, 0.92);
+  padding: 10px 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 40px rgba(12, 18, 34, 0.45);
+}
+.workways-answer-pin-county {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #67e8f9;
+}
+.workways-answer-pin-headline {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #fff;
+}
+
+/* Local news map pins */
+.map-news-marker {
+  width: 18px;
+  height: 18px;
+}
+.map-news-marker-pulse {
+  opacity: 0.35;
+  animation: map-news-pulse 2.4s ease-out infinite;
+}
+.map-news-marker-icon {
+  transform: rotate(45deg);
+}
+.map-news-marker:hover .map-news-marker-pulse {
+  opacity: 0.55;
+}
+@keyframes map-news-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.mapboxgl-popup.map-news-popup .mapboxgl-popup-content,
+.maplibregl-popup.map-news-popup .maplibregl-popup-content {
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 18, 34, 0.92);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.map-news-popup-card {
+  padding: 12px 14px;
+  max-width: 260px;
+}
+.map-news-popup-kicker {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fbbf24;
+}
+.map-news-popup-headline {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #fff;
+}
+.map-news-popup-blurb {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.62);
+}
+.map-news-popup-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #67e8f9;
+  text-decoration: none;
+}
+.map-news-popup-link:hover {
+  text-decoration: underline;
+}
+
+@keyframes map-paint-flash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.mapboxgl-popup.workways-county-popup .mapboxgl-popup-content {
+  background: rgba(8, 12, 20, 0.88);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+}
+.mapboxgl-popup.workways-county-popup .county-popup-value {
+  color: #67e8f9;
+}
+
+.map-ask-input,
+.map-ask-input:focus,
+.map-ask-input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+:focus-visible.map-ask-input {
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+/* Scrollbar polish */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
 }
