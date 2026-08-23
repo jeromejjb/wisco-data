@@ -1,13 +1,16 @@
 import type { Job } from "@/lib/types";
 import { filterJobs, rankJobsByReach } from "@/lib/jobs-filter";
 import { buildJobsMeta, type JobsMeta } from "@/lib/jobs-errors";
-import { fetchUsaJobsWisconsin, fetchAdzunaJobs } from "@/services/clients/jobs-api";
+import { fetchUsaJobsWisconsin, fetchAdzunaJobs, parseJobSearchLocation } from "@/services/clients/jobs-api";
 import { enrichJobsWithCommuteEstimates } from "@/services/live/commute-enrichment";
 import { getJobsEnvStatus } from "@/lib/jobs-env";
+import { haversineKm } from "@/lib/user-area";
+import { COMMUTE_POLICY, driveMinutesFromKm } from "@/lib/commute-policy";
 
 export type JobsFilterParams = {
   keyword?: string;
   industry?: string;
+  location?: string;
   transitOnly?: boolean;
   maxCommute?: number;
   maxTransfers?: number;
@@ -17,16 +20,38 @@ export type JobsFilterParams = {
 
 export async function getLiveJobs(params: JobsFilterParams = {}) {
   const env = getJobsEnvStatus();
+  const searchLocation = params.location?.trim() || "Wisconsin";
+  const searchAnchor =
+    searchLocation.toLowerCase() !== "wisconsin"
+      ? parseJobSearchLocation(searchLocation)
+      : undefined;
+  const maxCommute = params.maxCommute ?? COMMUTE_POLICY.recommendedMaxMinutes;
 
   const [usajobs, adzuna] = await Promise.all([
-    fetchUsaJobsWisconsin({ keyword: params.keyword, location: "Wisconsin" }),
-    fetchAdzunaJobs({ keyword: params.keyword, where: "Wisconsin" }),
+    fetchUsaJobsWisconsin({ keyword: params.keyword, location: searchLocation }),
+    fetchAdzunaJobs({ keyword: params.keyword, where: searchLocation }),
   ]);
 
   const liveJobs = dedupeJobs([...usajobs.jobs, ...adzuna.jobs]);
-  const enriched = await enrichJobsWithCommuteEstimates(liveJobs);
+  const enriched = await enrichJobsWithCommuteEstimates(liveJobs, {
+    searchAnchor: searchAnchor
+      ? { lat: searchAnchor.lat, lng: searchAnchor.lng }
+      : undefined,
+  });
 
-  let results = filterJobs(enriched, params);
+  let pool = enriched;
+  if (searchAnchor) {
+    pool = enriched.filter(
+      (job) =>
+        haversineKm(job.location.coordinates, searchAnchor) <= COMMUTE_POLICY.searchRadiusKm
+    );
+  }
+
+  const effectiveMaxCommute = searchAnchor
+    ? Math.max(maxCommute, driveMinutesFromKm(COMMUTE_POLICY.searchRadiusKm))
+    : maxCommute;
+
+  let results = filterJobs(pool, { ...params, maxCommute: effectiveMaxCommute });
   if (params.rankByReach) results = rankJobsByReach(results);
 
   const meta = buildJobsMeta({
@@ -35,6 +60,8 @@ export async function getLiveJobs(params: JobsFilterParams = {}) {
     adzunaError: adzuna.error,
     liveCount: liveJobs.length,
     resultCount: results.length,
+    searchLocation: searchAnchor ? searchLocation : undefined,
+    poolCount: searchAnchor ? pool.length : undefined,
   });
 
   const sources: string[] = [];

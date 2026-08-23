@@ -30,19 +30,61 @@ export async function getLiveEconomyData() {
   return cached("economy:live", 3_600_000, fetchLiveEconomyData);
 }
 
-/** Fast path for home map — one WisConomy fetch, ~50ms vs full economy bundle. */
+/** Fast path for home map — WisConomy + optional Census demographics. */
 export async function getEconomyMapSeed() {
   return cached("economy:map-seed", 3_600_000, async () => {
-    const wisconomy = await fetchWisConomyCountyRates();
+    const { fetchCensusCounties } = await import("@/services/clients/census-fred");
+    const [wisconomy, census] = await Promise.all([
+      fetchWisConomyCountyRates(),
+      fetchCensusCounties(),
+    ]);
+
     const unemploymentByFips: Record<string, number> = {};
     const countyLabelsByFips: Record<string, string> = {};
+    const laborForceByFips: Record<string, number> = {};
+    const populationByFips: Record<string, number> = {};
+    const populationEstimateByFips: Record<string, boolean> = {};
+    const medianIncomeByFips: Record<string, number> = {};
+
     for (const row of wisconomy.counties) {
       const fips = WI_COUNTY_NAME_TO_FIPS[row.name];
       if (!fips) continue;
       unemploymentByFips[fips] = Math.round(row.unemploymentRate * 10) / 10;
       countyLabelsByFips[fips] = `${row.unemploymentRate.toFixed(1)}% unemployed`;
+      if (row.laborForce > 0) laborForceByFips[fips] = row.laborForce;
     }
-    return { unemploymentByFips, countyLabelsByFips };
+
+    if (census) {
+      const { censusRowNameToFips } = await import("@/lib/county-lookup");
+      for (const row of census) {
+        const fips = censusRowNameToFips(row.name);
+        if (!fips || row.population <= 0) continue;
+        populationByFips[fips] = row.population;
+        populationEstimateByFips[fips] = false;
+        if (row.medianHouseholdIncome && row.medianHouseholdIncome > 0) {
+          medianIncomeByFips[fips] = row.medianHouseholdIncome;
+        }
+      }
+    }
+
+    const { estimatePopulationFromLaborForce } = await import("@/lib/format-population");
+    for (const [fips, lf] of Object.entries(laborForceByFips)) {
+      if (populationByFips[fips]) continue;
+      const est = estimatePopulationFromLaborForce(lf);
+      if (est > 0) {
+        populationByFips[fips] = est;
+        populationEstimateByFips[fips] = true;
+      }
+    }
+
+    return {
+      unemploymentByFips,
+      countyLabelsByFips,
+      laborForceByFips,
+      populationByFips,
+      populationEstimateByFips,
+      medianIncomeByFips,
+    };
   });
 }
 
@@ -88,6 +130,7 @@ async function fetchLiveEconomyData() {
       name: county.name,
       fips: county.fips,
       coordinates: { lat: county.lat, lng: county.lng },
+      population: censusRow?.population ?? undefined,
       unemploymentRate: Math.round(unemployment * 10) / 10,
       laborForceParticipation: Math.round(Math.min(85, Math.max(55, lfpr)) * 10) / 10,
       openJobs: Math.round(employment * 0.028),

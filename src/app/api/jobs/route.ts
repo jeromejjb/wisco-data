@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   try {
     const result = await getLiveJobs({
       keyword: searchParams.get("q") ?? undefined,
+      location: searchParams.get("location") ?? undefined,
       industry: searchParams.get("industry") ?? undefined,
       transitOnly: searchParams.get("transit") === "true",
       maxCommute: searchParams.get("maxCommute")

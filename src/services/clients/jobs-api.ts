@@ -1,27 +1,30 @@
 import type { Job } from "@/lib/types";
 import { cached } from "@/lib/cache";
+import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
+import { countyIdsFromText } from "@/lib/county-lookup";
 
-const WI_CITIES: Record<string, { lat: number; lng: number; county: string }> = {
-  milwaukee: { lat: 43.0389, lng: -87.9065, county: "Milwaukee" },
-  madison: { lat: 43.0731, lng: -89.4012, county: "Dane" },
-  "green bay": { lat: 44.5133, lng: -88.0133, county: "Brown" },
-  kenosha: { lat: 42.5847, lng: -87.8212, county: "Kenosha" },
-  racine: { lat: 42.7261, lng: -87.7829, county: "Racine" },
-  appleton: { lat: 44.2619, lng: -88.4154, county: "Outagamie" },
-  "eau claire": { lat: 44.8113, lng: -91.4985, county: "Eau Claire" },
-};
-
-function parseLocation(location: string) {
-  const lower = location.toLowerCase();
-  for (const [city, coords] of Object.entries(WI_CITIES)) {
-    if (lower.includes(city)) {
-      return { city: city.split(" ").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "), ...coords };
-    }
+function parseLocation(location: string): { city: string; lat: number; lng: number; county: string } {
+  const cityMatch = matchCityInText(location);
+  if (cityMatch) {
+    const area = userAreaFromCountyId(cityMatch.countyId);
+    return { city: cityMatch.cityLabel, lat: area.lat, lng: area.lng, county: area.displayName };
   }
+
+  const [countyId] = countyIdsFromText(location);
+  if (countyId) {
+    const area = userAreaFromCountyId(countyId);
+    return { city: area.displayName, lat: area.lat, lng: area.lng, county: area.displayName };
+  }
+
+  const lower = location.toLowerCase();
   if (lower.includes("wisconsin") || lower.includes(", wi")) {
     return { city: "Madison", lat: 43.0731, lng: -89.4012, county: "Dane" };
   }
   return { city: "Milwaukee", lat: 43.0389, lng: -87.9065, county: "Milwaukee" };
+}
+
+export function parseJobSearchLocation(location: string) {
+  return parseLocation(location);
 }
 
 type UsaJobsResult = {

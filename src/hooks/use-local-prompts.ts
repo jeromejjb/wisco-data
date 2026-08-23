@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
 import { useAppStore } from "@/lib/store";
 import { useUserArea } from "@/hooks/use-user-area";
+import { useClientReady } from "@/hooks/use-client-ready";
 import {
   buildAreaChatStarters,
   defaultChatStarters,
@@ -12,11 +13,13 @@ import {
   type LocalNewsMapPin,
   type ChatStarter,
 } from "@/lib/agent/chat-starters";
-import { logPromptExperiment } from "@/lib/agent/prompt-experiments";
+import { getOrCreateSessionId, logPromptExperiment } from "@/lib/agent/prompt-experiments";
+import { DEFAULT_USER_AREA } from "@/lib/user-area";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useLocalPrompts() {
+  const clientReady = useClientReady();
   const { area, meta, loading: areaLoading, locationPromptsEnabled } = useUserArea();
   const newsPromptsEnabled = useAppStore((s) => s.newsPromptsEnabled);
   const setNewsPromptsEnabled = useAppStore((s) => s.setNewsPromptsEnabled);
@@ -41,18 +44,33 @@ export function useLocalPrompts() {
   const newsSentiment = newsData?.sentiment ?? null;
   const newsMapPins = newsData?.mapPins ?? [];
 
+  const sessionId = useMemo(
+    () => (clientReady ? getOrCreateSessionId() : null),
+    [clientReady]
+  );
+
   const starters: ChatStarter[] = useMemo(() => {
     if (!locationPromptsEnabled) return defaultChatStarters();
-    return buildAreaChatStarters(area, {
+    const starterArea = clientReady ? area : DEFAULT_USER_AREA;
+    return buildAreaChatStarters(starterArea, {
       newsEnabled: newsPromptsEnabled,
-      newsItems,
-      includeStatewide: area.source !== "default",
+      newsItems: clientReady ? newsItems : [],
+      includeStatewide: clientReady && starterArea.source !== "default",
+      sessionId,
     });
-  }, [area, locationPromptsEnabled, newsPromptsEnabled, newsItems]);
+  }, [
+    area,
+    clientReady,
+    locationPromptsEnabled,
+    newsPromptsEnabled,
+    newsItems,
+    sessionId,
+  ]);
 
   const loggedImpressions = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!clientReady) return;
     for (const s of starters) {
       if (!s.experiment || loggedImpressions.current.has(s.id)) continue;
       loggedImpressions.current.add(s.id);
@@ -75,7 +93,7 @@ export function useLocalPrompts() {
         }),
       }).catch(() => {});
     }
-  }, [starters, area.countyId]);
+  }, [starters, area.countyId, clientReady]);
 
   function trackStarterClick(starter: ChatStarter) {
     if (starter.experiment) {

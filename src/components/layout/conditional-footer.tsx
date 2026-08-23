@@ -1,10 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Footer } from "./header";
+import { RouteFooter } from "./site-footer";
 
 export function ConditionalFooter() {
-  const pathname = usePathname();
-  if (pathname === "/") return null;
-  return <Footer />;
+  return <RouteFooter />;
 }

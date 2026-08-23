@@ -43,6 +43,10 @@ export function useMapEconomySeed() {
     data: {
       unemploymentByFips: Record<string, number>;
       countyLabelsByFips: Record<string, string>;
+      populationByFips?: Record<string, number>;
+      populationEstimateByFips?: Record<string, boolean>;
+      laborForceByFips?: Record<string, number>;
+      medianIncomeByFips?: Record<string, number>;
     };
   }>("/api/economy/map", fetcher, {
     revalidateOnFocus: false,

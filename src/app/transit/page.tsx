@@ -1,169 +1,285 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { Suspense, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Clock, Share2, Bookmark, Bus, MapPin } from "lucide-react";
+import { Bus, Layers, MapPin, Radio, RefreshCw } from "lucide-react";
 import { RouteCard, RouteTimeline } from "@/components/transit/route-card";
-import { WorkwaysMap } from "@/components/map/workways-map";
+import { TransitDetailSheet } from "@/components/transit/transit-detail-sheet";
+import type { TransitMapSelection } from "@/components/transit/transit-map";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourcePanel, PageHero } from "@/components/data/source-panel";
 import { LiveBadge } from "@/components/ui/live-badge";
 import { Skeleton } from "@/components/ui/states";
-import { useTransitData } from "@/hooks/use-live-data";
-import { useEffect, useState as useReactState } from "react";
-import type { Job } from "@/lib/types";
+import { useTransitMapData } from "@/hooks/use-transit-map-data";
+import {
+  TRANSIT_AGENCY_LIST,
+  type TransitAgencyId,
+  isTransitAgencyId,
+} from "@/lib/transit-agencies";
+import { cn } from "@/lib/utils";
+
+const TransitMap = dynamic(
+  () => import("@/components/transit/transit-map").then((m) => m.TransitMap),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[min(52vh,420px)] w-full rounded-2xl" />,
+  }
+);
 
 function TransitContent() {
   const searchParams = useSearchParams();
-  const jobId = searchParams.get("job");
+  const agencyParam = searchParams.get("agency");
   const destParam = searchParams.get("dest");
-  const [job, setJob] = useReactState<Job | undefined>();
 
-  useEffect(() => {
-    if (jobId) {
-      fetch(`/api/jobs`)
-        .then((r) => r.json())
-        .then((json) => {
-          const found = json.data?.find((j: Job) => j.id === jobId);
-          setJob(found);
-        });
-    }
-  }, [jobId]);
+  const [agency, setAgency] = useState<TransitAgencyId | "all">(
+    agencyParam && isTransitAgencyId(agencyParam) ? agencyParam : "mcts"
+  );
+  const [originInput, setOriginInput] = useState("Milwaukee Intermodal Station");
+  const [destInput, setDestInput] = useState(destParam ?? "9200 W Wisconsin Ave, Milwaukee, WI");
+  const [selection, setSelection] = useState<TransitMapSelection | null>(null);
+  const [layerToggles, setLayerToggles] = useState({ routes: true, stops: true, vehicles: true });
 
-  const { data, isLoading } = useTransitData("Home", "Workplace");
+  const { data, isLoading, mutate, isValidating } = useTransitMapData({
+    agency,
+    origin: originInput,
+    destination: destInput,
+    pollRealtime: true,
+  });
+
   const transit = data?.data;
   const provenance = data?.provenance;
-
-  const origin = transit?.origin;
-  const destination = destParam ?? job?.location.address ?? "9200 W Wisconsin Ave, Milwaukee, WI";
   const routes = transit?.routes ?? [];
-  const alerts = transit?.alerts ?? [];
-  const agencies = transit?.agencies ?? [];
-  const stops = transit?.stops ?? [];
+  const [selectedRouteId, setSelectedRouteId] = useState<string | undefined>();
 
-  const [selectedRouteId, setSelectedRouteId] = useState(routes[0]?.id);
-  const [timeMode, setTimeMode] = useState<"leave" | "arrive">("arrive");
+  const mapCenter = useMemo(
+    () => transit?.mapCenter ?? TRANSIT_AGENCY_LIST.find((a) => a.id === agency)?.center ?? TRANSIT_AGENCY_LIST[0]!.center,
+    [transit?.mapCenter, agency]
+  );
 
-  const selectedRoute = routes.find((r) => r.id === selectedRouteId) ?? routes[0];
+  const mapZoom = transit?.mapZoom ?? 12;
 
-  const markers = [
-    origin && {
-      id: "origin",
-      coordinates: origin.coordinates,
-      color: "#267a55",
-    },
-    {
-      id: "dest",
-      coordinates: job?.location.coordinates ?? { lat: 43.0382, lng: -88.0289 },
-      color: "#d4824a",
-      selected: true,
-    },
-    ...stops.slice(0, 30).map((s) => ({
-      id: s.id,
-      coordinates: { lat: s.lat, lng: s.lng },
-      color: "#1e6b9c33",
-    })),
-  ].filter(Boolean) as { id: string; coordinates: { lat: number; lng: number }; color?: string; selected?: boolean }[];
+  const stats = {
+    totalStops: transit?.stops.length,
+    routeShapes: transit?.shapes.length,
+    liveVehicles: transit?.vehicles.length,
+  };
 
   return (
     <div>
       <PageHero
-        eyebrow="Official GTFS feeds"
+        eyebrow="Wisconsin transit · GTFS + realtime"
         title="Transit to Work"
-        description="Plan trips using live MCTS and Madison Metro GTFS stop inventory, route data, and Madison GTFS-Realtime service alerts."
+        description="Route lines, stops, and live vehicle positions from official GTFS feeds — optimized for mobile and desktop."
       >
         {transit?.stats && (
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {transit.stats.totalStops.toLocaleString()} live stops</span>
-            <span className="flex items-center gap-1.5"><Bus className="h-4 w-4" /> {transit.stats.totalRoutes} routes · {transit.stats.agencies} agencies</span>
-            <LiveBadge label="GTFS live" />
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" /> {transit.stops.length.toLocaleString()} stops on map
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Bus className="h-4 w-4" /> {transit.shapes.length} route lines
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Radio className="h-4 w-4" /> {transit.vehicles.length} live vehicles
+            </span>
+            <LiveBadge label={isValidating ? "Updating…" : "GTFS live"} />
           </div>
         )}
       </PageHero>
 
-      <div className="mx-auto max-w-[1600px] px-4 py-8 lg:px-8">
-        {job && !job.isOpen && (
-          <div className="mb-6 glass-panel rounded-2xl border-amber-200/50 bg-amber-50/80 p-5 dark:bg-amber-900/20">
-            <p className="font-semibold">This job is no longer accepting applications</p>
-            <p className="mt-1 text-sm text-muted-foreground">You can still plan a commute to this workplace.</p>
-            <Link href="/jobs" className="mt-2 inline-block text-sm font-semibold text-lake-600 hover:underline">Explore nearby jobs</Link>
-          </div>
-        )}
-
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="space-y-4 lg:col-span-2">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 lg:px-8">
+        <div className="grid gap-5 lg:grid-cols-12">
+          {/* Sidebar — stacks above map on mobile */}
+          <div className="space-y-4 lg:col-span-4 xl:col-span-3">
             <Card className="glass-panel border-0 shadow-lg">
-              <CardHeader><CardTitle className="font-display">Trip planner</CardTitle></CardHeader>
+              <CardHeader className="pb-2">
+                <CardTitle className="font-display text-lg">Metro & agency</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-4">
-                <div><Label htmlFor="origin">From</Label><Input id="origin" defaultValue={origin?.address} className="mt-1.5 rounded-xl" /></div>
-                <div><Label htmlFor="dest">To</Label><Input id="dest" defaultValue={destination} className="mt-1.5 rounded-xl" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>When</Label>
-                    <Select value={timeMode} onChange={(e) => setTimeMode(e.target.value as "leave" | "arrive")} className="mt-1.5 rounded-xl">
-                      <option value="leave">Leave at</option>
-                      <option value="arrive">Arrive by</option>
-                    </Select>
-                  </div>
-                  <div><Label htmlFor="time">Time</Label><Input id="time" type="time" defaultValue="07:30" className="mt-1.5 rounded-xl" /></div>
+                <div>
+                  <Label htmlFor="agency">Transit system</Label>
+                  <Select
+                    id="agency"
+                    value={agency}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setAgency(isTransitAgencyId(v) ? v : "mcts");
+                      setSelection(null);
+                    }}
+                    className="mt-1.5 rounded-xl"
+                  >
+                    {TRANSIT_AGENCY_LIST.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.shortName}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
-                <Button className="w-full rounded-2xl">Find routes</Button>
+
+                <div>
+                  <Label htmlFor="origin">From</Label>
+                  <Input
+                    id="origin"
+                    value={originInput}
+                    onChange={(e) => setOriginInput(e.target.value)}
+                    className="mt-1.5 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dest">To</Label>
+                  <Input
+                    id="dest"
+                    value={destInput}
+                    onChange={(e) => setDestInput(e.target.value)}
+                    className="mt-1.5 rounded-xl"
+                  />
+                </div>
+
+                <Button
+                  className="w-full rounded-2xl"
+                  onClick={() => {
+                    void mutate();
+                    setSelectedRouteId(routes[0]?.id);
+                  }}
+                >
+                  Refresh map & routes
+                </Button>
               </CardContent>
             </Card>
 
-            {agencies.map((a) => (
-              <div key={a.id} className="glass-panel rounded-2xl p-4">
-                <p className="font-semibold">{a.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{a.stopCount.toLocaleString()} stops · {a.routeCount} routes</p>
-              </div>
-            ))}
+            <Card className="glass-panel border-0 shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 font-display text-base">
+                  <Layers className="h-4 w-4" /> Map layers
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["routes", "Route lines"],
+                    ["stops", "Stops"],
+                    ["vehicles", "Live buses"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setLayerToggles((l) => ({ ...l, [key]: !l[key] }))}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                      layerToggles[key]
+                        ? "bg-lake-600 text-white"
+                        : "bg-black/5 text-muted-foreground dark:bg-white/10"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => void mutate()}
+                  className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-lake-600"
+                >
+                  <RefreshCw className={cn("h-3 w-3", isValidating && "animate-spin")} />
+                  Sync
+                </button>
+              </CardContent>
+            </Card>
 
-            {alerts.map((alert) => (
-              <div key={alert.id} className="glass-panel rounded-2xl p-4 text-sm">
-                <p className="font-semibold">{alert.title}</p>
-                <p className="mt-1 text-muted-foreground">{alert.description}</p>
-                <p className="mt-2 text-xs text-lake-600">{alert.agency}</p>
+            <TransitDetailSheet
+              selection={selection}
+              alerts={transit?.alerts ?? []}
+              stats={stats}
+              onClose={() => setSelection(null)}
+            />
+
+            {(transit?.allAgencies ?? transit?.agencies ?? []).slice(0, 6).map((a) => (
+              <div key={a.id} className="glass-panel rounded-2xl p-4 text-sm">
+                <p className="font-semibold">{a.name}</p>
+                <p className="mt-1 text-muted-foreground">
+                  {a.stopCount.toLocaleString()} stops · {a.routeCount} routes
+                  {a.hasRealtime ? " · realtime" : ""}
+                </p>
               </div>
             ))}
           </div>
 
-          <div className="space-y-4 lg:col-span-3">
-            {isLoading ? (
-              <Skeleton className="h-[360px] w-full rounded-3xl" />
-            ) : (
-              <WorkwaysMap center={job?.location.coordinates ?? origin?.coordinates} zoom={12} markers={markers} className="h-[360px] shadow-xl" />
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="rounded-xl"><Bookmark className="h-4 w-4" /> Save</Button>
-              <Button variant="outline" size="sm" className="rounded-xl"><Share2 className="h-4 w-4" /> Share</Button>
-              <Button variant="outline" size="sm" className="rounded-xl"><Calendar className="h-4 w-4" /> Calendar</Button>
+          {/* Map + routes */}
+          <div className="space-y-4 lg:col-span-8 xl:col-span-9">
+            <div className="relative overflow-hidden rounded-3xl shadow-xl ring-1 ring-black/5">
+              {isLoading ? (
+                <Skeleton className="h-[min(52vh,420px)] w-full" />
+              ) : (
+                <TransitMap
+                  center={mapCenter}
+                  zoom={mapZoom}
+                  shapes={transit?.shapes}
+                  stops={transit?.stops}
+                  vehicles={transit?.vehicles}
+                  selectedId={selection?.item.id}
+                  onSelect={setSelection}
+                  layers={layerToggles}
+                  className="rounded-none"
+                />
+              )}
             </div>
 
-            <h2 className="font-display text-lg font-bold">Route options</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              {routes.map((route) => (
-                <RouteCard key={route.id} route={route} selected={route.id === selectedRouteId} onSelect={() => setSelectedRouteId(route.id)} />
-              ))}
+            <div className="lg:hidden">
+              <TransitDetailSheet
+                selection={selection}
+                alerts={transit?.alerts ?? []}
+                stats={stats}
+                onClose={() => setSelection(null)}
+              />
             </div>
 
-            {selectedRoute && (
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="font-display text-lg font-bold">Trip options</h2>
+                <p className="text-xs text-muted-foreground">Scheduled estimates · router coming soon</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {routes.map((route) => (
+                  <RouteCard
+                    key={route.id}
+                    route={route}
+                    selected={route.id === (selectedRouteId ?? routes[0]?.id)}
+                    onSelect={() => setSelectedRouteId(route.id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {routes[0] && (
               <Card className="glass-panel border-0">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 font-display">
-                    <Clock className="h-5 w-5" /> {selectedRoute.label}
+                  <CardTitle className="font-display">
+                    {(routes.find((r) => r.id === selectedRouteId) ?? routes[0]).label}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RouteTimeline route={selectedRoute} />
+                  <RouteTimeline route={routes.find((r) => r.id === selectedRouteId) ?? routes[0]!} />
                 </CardContent>
               </Card>
             )}
 
-            {provenance && <SourcePanel provenance={provenance} activeSources={["gtfs-mcts", "gtfs-madison"]} />}
+            {provenance && (
+              <SourcePanel
+                provenance={provenance}
+                activeSources={["gtfs-mcts", "gtfs-madison"]}
+              />
+            )}
+
+            <p className="text-center text-xs text-muted-foreground">
+              Need jobs near transit?{" "}
+              <Link href="/jobs?transit=true" className="font-semibold text-lake-600 hover:underline">
+                Browse transit-accessible listings
+              </Link>
+            </p>
           </div>
         </div>
       </div>
@@ -173,7 +289,7 @@ function TransitContent() {
 
 export default function TransitPage() {
   return (
-    <Suspense fallback={<div className="p-8">Loading planner…</div>}>
+    <Suspense fallback={<div className="p-8">Loading transit map…</div>}>
       <TransitContent />
     </Suspense>
   );

@@ -12,6 +12,7 @@ import type { UserArea } from "@/lib/user-area";
 import { analyzeAreaSentiment } from "@/services/live/news-sentiment";
 import { fetchGNewsArticles } from "@/services/clients/gnews";
 import { fetchGoogleNewsRss } from "@/services/clients/news-rss";
+import { fetchBizJournalNews } from "@/services/clients/biz-journals";
 import type { AreaNewsBundle, LocalNewsMapPin } from "@/lib/news-types";
 
 function enrichItem(raw: Omit<AreaNewsItem, "topic" | "tone" | "countyId" | "countyName" | "coordinates" | "mapLabel">, area: UserArea): AreaNewsItem {
@@ -55,13 +56,20 @@ function dedupeNews(items: AreaNewsItem[]): AreaNewsItem[] {
   });
 }
 
-export async function fetchAreaNewsBundle(area: UserArea, limit = 6): Promise<AreaNewsBundle> {
-  const cacheKey = `news-bundle:${area.countyId}:${limit}`;
+export async function fetchAreaNewsBundle(
+  area: UserArea,
+  limit = 6,
+  opts?: { includeBizJournals?: boolean; bizDevelopmentOnly?: boolean }
+): Promise<AreaNewsBundle> {
+  const includeBiz = opts?.includeBizJournals !== false;
+  const cacheKey = `news-bundle:${area.countyId}:${limit}:${includeBiz ? "biz" : "no-biz"}:${opts?.bizDevelopmentOnly ? "dev" : "all"}`;
   return cached(cacheKey, 30 * 60 * 1000, async () => {
     const sources: string[] = [];
     const gnewsKey = process.env.GNEWS_API_KEY?.trim();
 
     let rawItems: AreaNewsItem[] = [];
+    let bizJournalItems: AreaNewsItem[] = [];
+    let bizJournalSources: string[] = [];
 
     if (gnewsKey) {
       const gnews = await fetchGNewsArticles(area, limit);
@@ -75,7 +83,17 @@ export async function fetchAreaNewsBundle(area: UserArea, limit = 6): Promise<Ar
     const rssItems = await fetchGoogleNewsRss(area, limit);
     if (rssItems.length) sources.push("Google News RSS");
 
-    rawItems = dedupeNews([...rawItems, ...rssItems]).slice(0, limit);
+    if (includeBiz) {
+      const biz = await fetchBizJournalNews(area, limit, {
+        developmentOnly: opts?.bizDevelopmentOnly,
+      });
+      bizJournalItems = biz.items;
+      bizJournalSources = biz.sources;
+      if (biz.sources.length) sources.push(...biz.sources);
+      rawItems.push(...biz.items);
+    }
+
+    rawItems = dedupeNews([...rawItems, ...rssItems]).slice(0, limit + (includeBiz ? 4 : 0));
     const items = rawItems.map((item) => enrichItem(item, area));
     const mapPins = toMapPins(items);
 
@@ -87,10 +105,12 @@ export async function fetchAreaNewsBundle(area: UserArea, limit = 6): Promise<Ar
       items,
       sentiment,
       mapPins,
+      bizJournalItems: bizJournalItems.map((item) => enrichItem(item, area)),
       meta: {
-        sources: sources.length ? sources : ["none"],
+        sources: sources.length ? [...new Set(sources)] : ["none"],
         gnewsConfigured: Boolean(gnewsKey),
         sentimentAvailable: Boolean(sentiment),
+        bizJournalSources,
       },
     };
   });

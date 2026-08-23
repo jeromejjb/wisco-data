@@ -13,6 +13,27 @@ export const METRIC_LABELS: Record<ChoroplethMetric, string> = {
   "transit-coverage": "Transit coverage",
 };
 
+export function formatMetricScaleEndpoint(
+  metric: ChoroplethMetric,
+  end: "min" | "max"
+): string {
+  const stops = METRIC_STOPS[metric];
+  const value = end === "min" ? stops[0][0] : stops[stops.length - 1][0];
+  switch (metric) {
+    case "unemployment":
+      return `${value.toFixed(1)}%`;
+    case "median-wage":
+      return `$${Math.round(value / 1000)}k`;
+    case "open-jobs":
+      return value >= 1000 ? `${Math.round(value / 1000)}k` : String(value);
+    case "opportunity":
+    case "transit-coverage":
+      return String(Math.round(value));
+    default:
+      return String(value);
+  }
+}
+
 export const METRIC_STOPS: Record<ChoroplethMetric, [number, string][]> = {
   unemployment: [
     [2.0, "#06b6d4"],
@@ -80,8 +101,8 @@ export function MapLegend({ metric, className }: MapLegendProps) {
           }}
         />
         <div className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-white/50">
-          <span>{metric === "median-wage" ? "$40k" : metric === "open-jobs" ? "2k" : "Low"}</span>
-          <span>{metric === "median-wage" ? "$65k" : metric === "open-jobs" ? "30k" : "High"}</span>
+          <span>{formatMetricScaleEndpoint(metric, "min")}</span>
+          <span>{formatMetricScaleEndpoint(metric, "max")}</span>
         </div>
       </div>
     </div>

@@ -114,37 +114,3 @@ export function Header() {
     </header>
   );
 }
-
-export function Footer() {
-  return (
-    <footer className="border-t border-border bg-navy-900 text-white dark:bg-navy-800">
-      <div className="mx-auto max-w-[1600px] px-4 py-12 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-3">
-          <div>
-            <p className="font-display text-lg font-bold">Wisconsin Workways</p>
-            <p className="mt-2 text-sm text-white/60">
-              Live economic intelligence powered by BLS, Wisconsin DWD WisConomy, and official GTFS transit feeds.
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-white/40">Live sources</p>
-            <ul className="mt-3 space-y-1.5 text-sm text-white/70">
-              <li>Bureau of Labor Statistics (LAUS, QCEW)</li>
-              <li>Wisconsin DWD WisConomy</li>
-              <li>MCTS & Madison Metro GTFS</li>
-            </ul>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-white/40">Note</p>
-            <p className="mt-3 text-sm text-white/60">
-              Commute estimates use GTFS stop proximity. Trip plans are scheduled-service estimates — verify with your transit agency.
-            </p>
-          </div>
-        </div>
-        <div className="mt-10 border-t border-white/10 pt-6 text-xs text-white/40">
-          Not an official Wisconsin state service · Add API keys in .env for USAJobs & Census enrichment
-        </div>
-      </div>
-    </footer>
-  );
-}

@@ -11,6 +11,7 @@ import { DataGatheringLoader } from "@/components/ui/data-gathering-loader";
 import { messagesForContext } from "@/lib/loading-messages";
 import { useUserArea } from "@/hooks/use-user-area";
 import { MapLocalNewsBridgeFromSession } from "@/components/agent/map-local-news-bridge";
+import { MapCountyPanel } from "@/components/agent/map-county-panel";
 import { MapAreaSentiment } from "@/components/agent/map-area-sentiment";
 import { useMapStore } from "@/lib/map-store";
 import { preloadCountiesGeoJson } from "@/lib/wi-counties-geojson";
@@ -24,11 +25,10 @@ const AgentMap = dynamic(
 );
 
 function WorkspaceMapOverlays() {
-  const areaSentiment = useMapStore((s) => s.areaSentiment);
   return (
     <>
       <MapLocalNewsBridgeFromSession />
-      <MapAreaSentiment sentiment={areaSentiment} />
+      <MapAreaSentiment />
     </>
   );
 }
@@ -37,8 +37,9 @@ function WorkspaceInner() {
   const { data: seed, isLoading } = useMapEconomySeed();
   const { area, loading: areaLoading } = useUserArea();
   const applyActions = useMapStore((s) => s.applyActions);
+  const setMapDemographics = useMapStore((s) => s.setMapDemographics);
   const seededRef = useRef(false);
-  const areaFramedRef = useRef(false);
+  const lastAreaCountyRef = useRef<string | null>(null);
   const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => {
@@ -46,8 +47,9 @@ function WorkspaceInner() {
   }, []);
 
   useEffect(() => {
-    if (areaFramedRef.current || areaLoading) return;
-    areaFramedRef.current = true;
+    if (areaLoading) return;
+    if (lastAreaCountyRef.current === area.countyId) return;
+    lastAreaCountyRef.current = area.countyId;
     applyActions([
       {
         type: "flyTo",
@@ -56,7 +58,7 @@ function WorkspaceInner() {
         pitch: 30,
       },
     ]);
-  }, [area, areaLoading, applyActions]);
+  }, [area.countyId, area.lat, area.lng, area.source, areaLoading, applyActions]);
 
   useEffect(() => {
     if (seededRef.current) return;
@@ -65,6 +67,13 @@ function WorkspaceInner() {
 
     seededRef.current = true;
     setDataReady(true);
+    setMapDemographics({
+      unemploymentByFips: byFips,
+      populationByFips: seed.data.populationByFips,
+      populationEstimateByFips: seed.data.populationEstimateByFips,
+      laborForceByFips: seed.data.laborForceByFips,
+      medianIncomeByFips: seed.data.medianIncomeByFips,
+    });
     applyActions([
       {
         type: "setChoropleth",
@@ -73,12 +82,13 @@ function WorkspaceInner() {
         labels: seed.data.countyLabelsByFips ?? {},
       },
     ]);
-  }, [seed, applyActions]);
+  }, [seed, applyActions, setMapDemographics]);
 
   return (
     <div className="fixed inset-0 z-0 h-dvh w-full overflow-hidden bg-[#e8eef4]">
       <AgentMap className="absolute inset-0 h-full w-full" immersive defaultStyleId="streets" />
       <WorkspaceLogo />
+      <MapCountyPanel />
       <MapAnswerStack />
       <WorkspaceMapOverlays />
       {!dataReady && isLoading && (

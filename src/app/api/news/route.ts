@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAreaNewsBundle } from "@/services/clients/local-news";
-import { buildUserArea, DEFAULT_USER_AREA } from "@/lib/user-area";
+import { userAreaFromCountyId, buildUserArea, DEFAULT_USER_AREA } from "@/lib/user-area";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,8 @@ export async function GET(req: NextRequest) {
   const countyId = searchParams.get("county");
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
-  const limit = Math.min(8, parseInt(searchParams.get("limit") ?? "6", 10) || 6);
+  const limit = Math.min(10, parseInt(searchParams.get("limit") ?? "6", 10) || 6);
+  const developmentOnly = searchParams.get("development") === "1";
 
   let area = DEFAULT_USER_AREA;
 
@@ -20,19 +21,19 @@ export async function GET(req: NextRequest) {
       area = buildUserArea({ lat: la, lng: ln }, "ip");
     }
   } else if (countyId) {
-    const { WI_COUNTIES } = await import("@/lib/wi-counties");
-    const fromList = WI_COUNTIES.find((c) => c.id === countyId);
-    if (fromList) {
-      area = buildUserArea({ lat: fromList.lat, lng: fromList.lng }, "default");
-    }
+    area = userAreaFromCountyId(countyId);
   }
 
   try {
-    const bundle = await fetchAreaNewsBundle(area, limit);
+    const bundle = await fetchAreaNewsBundle(area, limit, {
+      includeBizJournals: true,
+      bizDevelopmentOnly: developmentOnly,
+    });
     return NextResponse.json({
       data: bundle.items,
       sentiment: bundle.sentiment,
       mapPins: bundle.mapPins,
+      bizJournalItems: bundle.bizJournalItems ?? [],
       meta: bundle.meta,
       area: {
         countyId: area.countyId,

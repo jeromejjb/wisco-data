@@ -18,23 +18,30 @@ export type ExperimentVariant = {
 };
 
 /** Stable variant pick per session + experiment (50/50 style). */
-export function pickVariant(experimentId: string, variants: string[]): ExperimentVariant {
-  const session =
-    typeof window !== "undefined"
-      ? sessionStorage.getItem("workways-session-id") ??
-        (() => {
-          const id = crypto.randomUUID().slice(0, 8);
-          sessionStorage.setItem("workways-session-id", id);
-          return id;
-        })()
-      : "ssr";
+export function pickVariant(
+  experimentId: string,
+  variants: readonly string[],
+  sessionId: string | null
+): ExperimentVariant {
+  if (!sessionId) {
+    return { experimentId, variant: variants[0]! };
+  }
 
-  const hash = [...`${experimentId}:${session}`].reduce(
+  const hash = [...`${experimentId}:${sessionId}`].reduce(
     (acc, ch) => acc + ch.charCodeAt(0),
     0
   );
-  const variant = variants[hash % variants.length];
+  const variant = variants[hash % variants.length]!;
   return { experimentId, variant };
+}
+
+/** Client-only session id for experiment bucketing. Call after mount. */
+export function getOrCreateSessionId(): string {
+  const existing = sessionStorage.getItem("workways-session-id");
+  if (existing) return existing;
+  const id = crypto.randomUUID().slice(0, 8);
+  sessionStorage.setItem("workways-session-id", id);
+  return id;
 }
 
 export function logPromptExperiment(event: Omit<PromptExperimentEvent, "at">) {

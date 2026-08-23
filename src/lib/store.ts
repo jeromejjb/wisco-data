@@ -8,6 +8,9 @@ type AppState = {
   toggleDarkMode: () => void;
   homeLocation: SavedPlace | null;
   setHomeLocation: (place: SavedPlace | null) => void;
+  /** User-picked metro — persists across sessions */
+  chosenArea: UserArea | null;
+  setChosenArea: (area: UserArea | null) => void;
   /** Detected or chosen area for localized prompts */
   detectedArea: UserArea | null;
   setDetectedArea: (area: UserArea | null) => void;
@@ -34,6 +37,8 @@ export const useAppStore = create<AppState>()(
       toggleDarkMode: () => set({ darkMode: !get().darkMode }),
       homeLocation: null,
       setHomeLocation: (place) => set({ homeLocation: place }),
+      chosenArea: null,
+      setChosenArea: (area) => set({ chosenArea: area }),
       detectedArea: null,
       setDetectedArea: (area) => set({ detectedArea: area }),
       locationPromptsEnabled: true,
@@ -60,10 +65,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "wisconsin-workways",
-      version: 2,
+      version: 3,
       partialize: (state) => ({
         darkMode: state.darkMode,
         homeLocation: state.homeLocation,
+        chosenArea: state.chosenArea,
         locationPromptsEnabled: state.locationPromptsEnabled,
         newsPromptsEnabled: state.newsPromptsEnabled,
         browserLocationEnabled: state.browserLocationEnabled,

@@ -5,6 +5,7 @@ import { resolveAgentModel } from "./model";
 import type { ToolResultWithMap, ChoroplethMetric } from "./map-actions";
 import { getLiveEconomyData } from "@/services/live/economy";
 import { getLiveJobs } from "@/services/live/jobs";
+import { parseJobSearchLocation } from "@/services/clients/jobs-api";
 import { getLiveTransitData } from "@/services/live/transit";
 import {
   getDataSourceStatuses,
@@ -12,6 +13,8 @@ import {
   refreshLiveSources,
 } from "@/services/live/refresh";
 import { WI_COUNTIES } from "@/lib/wi-counties";
+import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
+import { countyIdsFromText } from "@/lib/county-lookup";
 
 function countyFipsMap() {
   return Object.fromEntries(WI_COUNTIES.map((c) => [c.id, c.fips]));
@@ -44,14 +47,20 @@ function choroplethFromCounties(
   return values;
 }
 
-function resolveCountyId(input: string): string | undefined {
+export function resolveCountyId(input: string): string | undefined {
   const normalized = input.trim().toLowerCase();
-  return WI_COUNTIES.find(
+  const featured = WI_COUNTIES.find(
     (c) =>
       c.id === normalized ||
       c.name.toLowerCase().includes(normalized) ||
       normalized.includes(c.name.split(" ")[0].toLowerCase())
   )?.id;
+  if (featured) return featured;
+
+  const cityMatch = matchCityInText(input);
+  if (cityMatch) return cityMatch.countyId;
+
+  return countyIdsFromText(input)[0];
 }
 
 function getModel() {
@@ -152,23 +161,18 @@ export const workwaysTools = {
       zoom: z.number().min(5).max(14).optional().describe("Map zoom level, default 8"),
     }),
     execute: async ({ location, zoom }): Promise<ToolResultWithMap> => {
-      const county = WI_COUNTIES.find(
-        (c) =>
-          c.name.toLowerCase().includes(location.toLowerCase()) ||
-          location.toLowerCase().includes(c.id)
-      );
-      const center = county
-        ? { lat: county.lat, lng: county.lng }
-        : { lat: 44.5, lng: -89.5 };
+      const id = resolveCountyId(location);
+      const area = id ? userAreaFromCountyId(id) : null;
+      const center = area ? { lat: area.lat, lng: area.lng } : { lat: 44.5, lng: -89.5 };
 
       return {
-        summary: `Flying to ${county?.name ?? location}`,
+        summary: `Flying to ${area?.countyName ?? location}`,
         mapActions: [
           {
             type: "flyTo",
             center,
-            zoom: zoom ?? (county ? 8.5 : 6.5),
-            pitch: county ? 35 : 0,
+            zoom: zoom ?? (area ? 8.5 : 6.5),
+            pitch: area ? 35 : 0,
           },
         ],
       };
@@ -217,7 +221,7 @@ export const workwaysTools = {
         .map((c) => resolveCountyId(c))
         .filter((id): id is string => Boolean(id));
 
-      const first = WI_COUNTIES.find((c) => c.id === ids[0]);
+      const first = ids[0] ? userAreaFromCountyId(ids[0]) : null;
 
       return {
         summary: `Highlighted ${ids.length} counties`,
@@ -242,6 +246,7 @@ export const workwaysTools = {
       "Search Wisconsin jobs and display them as markers on the map. Returns job data and places markers.",
     inputSchema: z.object({
       keyword: z.string().optional(),
+      location: z.string().optional().describe("City or area, e.g. Green Bay, Milwaukee"),
       transitOnly: z.boolean().optional(),
       maxCommute: z.number().optional(),
       industry: z.string().optional(),
@@ -250,6 +255,7 @@ export const workwaysTools = {
     execute: async (params): Promise<ToolResultWithMap> => {
       const result = await getLiveJobs({
         keyword: params.keyword,
+        location: params.location,
         transitOnly: params.transitOnly,
         maxCommute: params.maxCommute,
         industry: params.industry,
@@ -268,6 +274,8 @@ export const workwaysTools = {
         markers.reduce((s, m) => s + m.coordinates.lat, 0) / (markers.length || 1);
       const avgLng =
         markers.reduce((s, m) => s + m.coordinates.lng, 0) / (markers.length || 1);
+      const anchor = params.location ? parseJobSearchLocation(params.location) : null;
+      const flyCenter = anchor ?? { lat: avgLat, lng: avgLng };
 
       const summary =
         jobs.length > 0
@@ -289,16 +297,17 @@ export const workwaysTools = {
           provenance: result.provenance,
           meta: result.meta,
         },
-        mapActions: jobs.length
-          ? [
-              { type: "setMarkers", markers },
-              {
-                type: "flyTo",
-                center: { lat: avgLat, lng: avgLng },
-                zoom: 7.5,
-              },
-            ]
-          : [],
+        mapActions:
+          jobs.length || anchor
+            ? [
+                ...(jobs.length ? [{ type: "setMarkers" as const, markers }] : []),
+                {
+                  type: "flyTo" as const,
+                  center: { lat: flyCenter.lat, lng: flyCenter.lng },
+                  zoom: anchor ? 9 : 7.5,
+                },
+              ]
+            : [],
       };
     },
   }),

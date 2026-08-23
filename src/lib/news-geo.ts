@@ -1,25 +1,11 @@
-import { WI_COUNTIES } from "@/lib/wi-counties";
 import type { UserArea } from "@/lib/user-area";
+import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
+import { countyIdsFromText } from "@/lib/county-lookup";
 import type { Coordinates } from "@/lib/types";
 import type { NewsTopic, NewsTone } from "@/lib/news-types";
 
-const WI_CITIES: { name: string; countyId: string; lat: number; lng: number }[] = [
-  { name: "milwaukee", countyId: "milwaukee", lat: 43.0389, lng: -87.9065 },
-  { name: "madison", countyId: "dane", lat: 43.0731, lng: -89.4012 },
-  { name: "green bay", countyId: "brown", lat: 44.5133, lng: -88.0133 },
-  { name: "kenosha", countyId: "kenosha", lat: 42.5847, lng: -87.8212 },
-  { name: "racine", countyId: "racine", lat: 42.7261, lng: -87.7829 },
-  { name: "appleton", countyId: "outagamie", lat: 44.2619, lng: -88.4154 },
-  { name: "eau claire", countyId: "eau-claire", lat: 44.8113, lng: -91.4985 },
-  { name: "waukesha", countyId: "waukesha", lat: 43.0117, lng: -88.2315 },
-  { name: "oshkosh", countyId: "winnebago", lat: 44.0247, lng: -88.5426 },
-  { name: "wausau", countyId: "marathon", lat: 44.9591, lng: -89.6301 },
-  { name: "janesville", countyId: "rock", lat: 42.6828, lng: -89.0187 },
-  { name: "la crosse", countyId: "la-crosse", lat: 43.8014, lng: -91.2396 },
-];
-
 const TOPIC_KEYWORDS: Record<NewsTopic, RegExp> = {
-  jobs: /\b(hir(e|ing)|job|layoff|workforce|employ|plant|factory|union|wage)\b/i,
+  jobs: /\b(hir(e|ing)|job|layoff|workforce|employ|plant|factory|union|wage|relocat|expansion|headquarter)\b/i,
   economy: /\b(budget|tax|gdp|unemploy|inflation|econom|market|invest|grant)\b/i,
   civic: /\b(council|mayor|school|election|vote|legislat|capitol|state)\b/i,
   community: /\b(housing|transit|park|neighborhood|health|hospital|crime|fire)\b/i,
@@ -34,7 +20,7 @@ export function inferNewsTopic(text: string): NewsTopic {
   return "general";
 }
 
-const POSITIVE = /\b(hire|hiring|growth|expand|award|grant|boom|record|gain|opens|celebrat)\b/i;
+const POSITIVE = /\b(hire|hiring|growth|expand|expansion|award|grant|boom|record|gain|opens|celebrat|relocat|invest|jobs?\s+added|new (facility|plant|office))\b/i;
 const NEGATIVE = /\b(layoff|cut|crisis|crime|shoot|death|strike|shortage|deficit|closure|fail)\b/i;
 
 export function inferNewsTone(text: string): NewsTone {
@@ -59,28 +45,24 @@ export function locateNewsInWisconsin(
   text: string,
   fallback: UserArea
 ): { countyId: string; countyName: string; coordinates: Coordinates } {
-  const lower = text.toLowerCase();
-
-  for (const city of WI_CITIES) {
-    if (lower.includes(city.name)) {
-      const county = WI_COUNTIES.find((c) => c.id === city.countyId);
-      return {
-        countyId: city.countyId,
-        countyName: county?.name.replace(" County", "") ?? city.name,
-        coordinates: { lat: city.lat, lng: city.lng },
-      };
-    }
+  const cityMatch = matchCityInText(text);
+  if (cityMatch) {
+    const area = userAreaFromCountyId(cityMatch.countyId);
+    return {
+      countyId: area.countyId,
+      countyName: area.displayName,
+      coordinates: { lat: area.lat, lng: area.lng },
+    };
   }
 
-  for (const county of WI_COUNTIES) {
-    const short = county.name.replace(" County", "").toLowerCase();
-    if (lower.includes(short)) {
-      return {
-        countyId: county.id,
-        countyName: short.charAt(0).toUpperCase() + short.slice(1),
-        coordinates: { lat: county.lat, lng: county.lng },
-      };
-    }
+  const [countyId] = countyIdsFromText(text);
+  if (countyId) {
+    const area = userAreaFromCountyId(countyId);
+    return {
+      countyId: area.countyId,
+      countyName: area.displayName,
+      coordinates: { lat: area.lat, lng: area.lng },
+    };
   }
 
   return {

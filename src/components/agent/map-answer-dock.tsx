@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import type { WorkwaysAgentMessage } from "@/lib/agent/workways-agent";
 import type { UserArea } from "@/lib/user-area";
 import type { AreaNewsItem, ChatStarter } from "@/lib/agent/chat-starters";
+import { starterDisplayText } from "@/lib/agent/chat-starters";
 import { formatAssistantChatText, getMessageText } from "@/lib/agent/chat-display";
 import { AgentMapBridge } from "./agent-map-bridge";
 import { useAgentShell } from "./agent-shell";
@@ -329,8 +330,9 @@ export function MapAnswerDock({ onLayoutChange }: MapAnswerDockProps) {
                     disabled={isLoading}
                     onClick={() => pickStarter(s)}
                     className="rounded-full border border-black/[0.06] bg-[#f4f6f9] px-2.5 py-1 text-[11px] font-medium text-[#3d4659] hover:bg-white"
+                    title={s.text}
                   >
-                    {s.text.length > 36 ? `${s.text.slice(0, 33)}…` : s.text}
+                    {starterDisplayText(s)}
                   </button>
                 ))}
               </div>
@@ -358,7 +360,7 @@ export function MapAnswerDock({ onLayoutChange }: MapAnswerDockProps) {
             <span className="h-1 w-10 rounded-full bg-black/10" />
           </button>
 
-          <div className="overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="overflow-y-auto px-4 pb-[var(--safe-pb)]">
             <AnimatePresence>
               {showAnswerHero && mobileExpanded && (
                 <motion.div

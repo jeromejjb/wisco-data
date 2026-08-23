@@ -1,14 +1,6 @@
-import { WI_COUNTIES } from "@/lib/wi-counties";
+import { countyIdsFromText } from "@/lib/county-lookup";
 
-/** Shared county token matching for pins and intent. */
+/** Shared county token matching for pins and intent — all 72 WI counties. */
 export function countiesFromText(text: string): string[] {
-  const lower = text.toLowerCase();
-  const ids: string[] = [];
-  for (const c of WI_COUNTIES) {
-    const first = c.name.split(" ")[0].toLowerCase();
-    if (lower.includes(c.id) || lower.includes(first)) {
-      ids.push(c.id);
-    }
-  }
-  return [...new Set(ids)];
+  return countyIdsFromText(text);
 }

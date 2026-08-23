@@ -15,7 +15,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { cn } from "@/lib/utils";
 import { useMapStore } from "@/lib/map-store";
 import { useAppStore } from "@/lib/store";
-import { FIPS_BY_COUNTY_ID, WI_COUNTIES } from "@/lib/wi-counties";
+import { FIPS_BY_COUNTY_ID } from "@/lib/wi-counties";
+import { fipsFromCountyId, getCountyCoordinates, countyIdFromFips, countyDisplayName } from "@/lib/county-lookup";
+import { userAreaFromCountyId } from "@/lib/user-area";
+import { buildCountyHoverHtml } from "@/lib/county-hover-html";
 import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
 import {
   MapLegend,
@@ -23,7 +26,7 @@ import {
   fipsValuesFromCountyIds,
 } from "./map-legend";
 import { MapHud } from "./map-hud";
-import { MapStoryBanner, formatCountyDataValue } from "./map-story-banner";
+import { MapStoryBanner } from "./map-story-banner";
 import {
   getInitialMapStyle,
   resolveBasemapStyle,
@@ -40,6 +43,7 @@ import {
 } from "@/lib/map-styles";
 import { MapBasemapSwitcher } from "./map-basemap-switcher";
 import type { MapMarkerAction } from "@/lib/agent/map-actions";
+import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { topicLabel, toneColor } from "@/lib/news-geo";
 import type { LocalNewsMapPin } from "@/lib/news-types";
 
@@ -179,6 +183,10 @@ export function AgentMap({
   const hoverPopupRef = useRef<Popup | null>(null);
   const hoverCountyRef = useRef<string | null>(null);
   const hoverHandlersBound = useRef(false);
+  const mapDemographicsRef = useRef(useMapStore.getState().mapDemographics);
+  const choroplethMetricRef = useRef<ChoroplethMetric | null>(null);
+  const choroplethValuesRef = useRef<Record<string, number>>({});
+  const choroplethLabelsRef = useRef<Record<string, string>>({});
   const skipStyleChangeRef = useRef(true);
   const addCountyLayersRef = useRef<(map: MapLibreMap) => Promise<void>>(async () => {});
   const darkMode = useAppStore((s) => s.darkMode);
@@ -199,12 +207,15 @@ export function AgentMap({
     choroplethValues,
     choroplethLabels,
     highlightedCounties,
+    selectedCounty,
+    mapDemographics,
     routeCoordinates,
     routeColor,
     flyToNonce,
     mapPaintNonce,
     answerPin,
     localNewsPins,
+    localMapAnswer,
   } = useMapStore(
     useShallow((s) => ({
       center: s.center,
@@ -216,18 +227,29 @@ export function AgentMap({
       choroplethValues: s.choroplethValues,
       choroplethLabels: s.choroplethLabels,
       highlightedCounties: s.highlightedCounties,
+      selectedCounty: s.selectedCounty,
+      mapDemographics: s.mapDemographics,
       routeCoordinates: s.routeCoordinates,
       routeColor: s.routeColor,
       flyToNonce: s.flyToNonce,
       mapPaintNonce: s.mapPaintNonce,
       answerPin: s.answerPin,
       localNewsPins: s.localNewsPins,
+      localMapAnswer: s.localMapAnswer,
     }))
   );
 
   const [mapPulsing, setMapPulsing] = useState(false);
   const hasChoropleth =
     Boolean(choroplethMetric) && Object.keys(choroplethValues).length > 0;
+  const showCornerLegend = hasChoropleth && !localMapAnswer?.countyFocus;
+
+  useEffect(() => {
+    mapDemographicsRef.current = mapDemographics;
+    choroplethMetricRef.current = choroplethMetric;
+    choroplethValuesRef.current = choroplethValues;
+    choroplethLabelsRef.current = choroplethLabels;
+  }, [mapDemographics, choroplethMetric, choroplethValues, choroplethLabels]);
 
   useEffect(() => {
     if (mapPaintNonce === 0) return;
@@ -284,7 +306,7 @@ export function AgentMap({
         const expr = buildChoroplethExpression(
           choroplethMetric,
           fipsValues,
-          onSatellite ? "rgba(12,18,34,0.55)" : darkMode ? "#1a2438" : "#e2e8f0"
+          onSatellite ? "rgba(12,18,34,0.55)" : darkMode ? "#1a2438" : "#b8c8d8"
         );
         map.setPaintProperty(COUNTIES_FILL, "fill-color", expr);
         map.setPaintProperty(
@@ -419,17 +441,14 @@ export function AgentMap({
         map.on("mousemove", COUNTIES_FILL, (e) => {
           if (!e.features?.length) return;
           map.getCanvas().style.cursor = "pointer";
-          const name = e.features[0].properties?.name as string | undefined;
+          const rawName = e.features[0].properties?.name as string | undefined;
           const fips = String(e.features[0].properties?.fips ?? e.features[0].id ?? "");
-          if (!name) return;
+          if (!rawName || !fips) return;
 
-          const dataLine = formatCountyDataValue(
-            choroplethMetric,
-            fips,
-            choroplethValues,
-            choroplethLabels
-          );
-          const popupKey = `${name}:${dataLine ?? ""}`;
+          const demo = mapDemographicsRef.current;
+          const pop = demo.populationByFips[fips];
+          const metric = choroplethMetricRef.current;
+          const popupKey = `${fips}:${metric ?? ""}:${pop ?? ""}`;
 
           if (popupKey === hoverCountyRef.current && hoverPopupRef.current) {
             hoverPopupRef.current.setLngLat(e.lngLat);
@@ -442,22 +461,52 @@ export function AgentMap({
               closeButton: false,
               closeOnClick: false,
               className: "workways-popup workways-county-popup",
-              offset: 8,
+              offset: 12,
+              maxWidth: "240px",
             }).addTo(map);
           }
-          hoverPopupRef.current
-            .setLngLat(e.lngLat)
-            .setHTML(
-              `<div class="county-popup-name">${name} County</div>${
-                dataLine ? `<div class="county-popup-value">${dataLine}</div>` : ""
-              }`
-            );
+
+          const html = buildCountyHoverHtml({
+            name: countyDisplayName(rawName),
+            fips,
+            population: pop,
+            populationIsEstimate: demo.populationEstimateByFips[fips],
+            medianIncome: demo.medianIncomeByFips[fips],
+            choroplethMetric: metric,
+            choroplethValues: choroplethValuesRef.current,
+            choroplethLabels: choroplethLabelsRef.current,
+            unemploymentRate: demo.unemploymentByFips[fips],
+          });
+
+          hoverPopupRef.current.setLngLat(e.lngLat).setHTML(html);
         });
         map.on("mouseleave", COUNTIES_FILL, () => {
           map.getCanvas().style.cursor = "";
           hoverCountyRef.current = null;
           hoverPopupRef.current?.remove();
           hoverPopupRef.current = null;
+        });
+        map.on("click", COUNTIES_FILL, (e) => {
+          if (!e.features?.length) return;
+          const rawName = e.features[0].properties?.name as string | undefined;
+          const fips = String(e.features[0].properties?.fips ?? e.features[0].id ?? "");
+          if (!rawName || !fips) return;
+
+          const shortName = rawName.replace(/ County$/i, "").trim();
+          useMapStore.getState().selectCounty({
+            fips,
+            name: shortName,
+            countyId: countyIdFromFips(fips),
+          });
+
+          hoverCountyRef.current = null;
+          hoverPopupRef.current?.remove();
+          hoverPopupRef.current = null;
+        });
+        map.on("click", (e) => {
+          const hit = map.queryRenderedFeatures(e.point, { layers: [COUNTIES_FILL] });
+          if (hit.length) return;
+          useMapStore.getState().clearSelectedCounty();
         });
       }
 
@@ -470,6 +519,7 @@ export function AgentMap({
   addCountyLayersRef.current = addCountyLayers;
 
   const navControlAddedRef = useRef(false);
+  const scaleControlAddedRef = useRef(false);
   const choroplethSigRef = useRef("");
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -530,6 +580,10 @@ export function AgentMap({
             "bottom-right"
           );
         }
+        if (!scaleControlAddedRef.current) {
+          scaleControlAddedRef.current = true;
+          map.addControl(new ScaleControl({ maxWidth: 120, unit: "imperial" }), "bottom-left");
+        }
       });
     };
 
@@ -568,6 +622,7 @@ export function AgentMap({
       map.remove();
       mapRef.current = null;
       navControlAddedRef.current = false;
+      scaleControlAddedRef.current = false;
       skipStyleChangeRef.current = true;
       setMapLoaded(false);
       setCountiesReady(false);
@@ -641,14 +696,19 @@ export function AgentMap({
     const map = mapRef.current;
     if (!map || !countiesReady || !map.getLayer(COUNTIES_HIGHLIGHT)) return;
 
-    const fipsList = highlightedCounties.map((id) => FIPS_BY_COUNTY_ID[id]).filter(Boolean);
+    const fipsList = Array.from(
+      new Set([
+        ...highlightedCounties.map((id) => FIPS_BY_COUNTY_ID[id] ?? fipsFromCountyId(id)).filter(Boolean),
+        ...(selectedCounty ? [selectedCounty.fips] : []),
+      ])
+    );
     if (fipsList.length === 0) {
       map.setPaintProperty(COUNTIES_HIGHLIGHT, "line-opacity", 0);
       return;
     }
     map.setFilter(COUNTIES_HIGHLIGHT, ["in", ["get", "fips"], ["literal", fipsList]]);
     map.setPaintProperty(COUNTIES_HIGHLIGHT, "line-opacity", 1);
-  }, [highlightedCounties, countiesReady]);
+  }, [highlightedCounties, selectedCounty, countiesReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -733,18 +793,22 @@ export function AgentMap({
       return;
     }
 
-    const county = WI_COUNTIES.find((c) => c.id === answerPin.countyId);
-    if (!county) return;
+    const coords =
+      getCountyCoordinates(answerPin.countyId) ??
+      (() => {
+        const a = userAreaFromCountyId(answerPin.countyId);
+        return { lat: a.lat, lng: a.lng };
+      })();
 
     if (!answerPinMarkerRef.current) {
       const el = document.createElement("div");
       el.className = "workways-answer-pin";
       el.innerHTML = '<span class="workways-answer-pin-dot" aria-hidden="true"></span>';
       answerPinMarkerRef.current = new Marker({ element: el, anchor: "center" })
-        .setLngLat([county.lng, county.lat])
+        .setLngLat([coords.lng, coords.lat])
         .addTo(map);
     } else {
-      answerPinMarkerRef.current.setLngLat([county.lng, county.lat]);
+      answerPinMarkerRef.current.setLngLat([coords.lng, coords.lat]);
     }
 
     answerPinPopupRef.current?.remove();
@@ -758,7 +822,7 @@ export function AgentMap({
       className: "workways-answer-pin-popup",
       maxWidth: "300px",
     })
-      .setLngLat([county.lng, county.lat])
+      .setLngLat([coords.lng, coords.lat])
       .setHTML(
         `<div class="workways-answer-pin-card"><p class="workways-answer-pin-county">${answerPin.countyName}</p><p class="workways-answer-pin-headline">${headline}</p></div>`
       )
@@ -850,6 +914,9 @@ export function AgentMap({
           />
           <MapLegend metric={choroplethMetric} className="z-10" />
         </>
+      )}
+      {immersive && showCornerLegend && (
+        <MapLegend metric={choroplethMetric} className="z-10 !bottom-[7.5rem] !left-4" />
       )}
       {!immersive && overlayMode && (
         <MapBasemapSwitcher

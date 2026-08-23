@@ -3,11 +3,19 @@ import type { CountyFocusSnapshot } from "@/lib/map-county-metrics";
 import {
   buildCountyFocus,
   choroplethFromCounties,
+  formatRankContext,
+  formatStateAvgLabel,
   headlineForCountyMetric,
 } from "@/lib/map-county-metrics";
+import { getMetricSources } from "@/lib/economy-metric-sources";
 import type { CountyEconomy } from "@/lib/types";
+import { WI_COUNTIES } from "@/lib/wi-counties";
+import { getCountyCoordinates } from "@/lib/county-lookup";
+import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
 
 import type { MapQueryIntent } from "./map-query-intent";
+import { COMMUTE_POLICY, classifyCommute } from "@/lib/commute-policy";
+import type { AreaNewsItem, LocalNewsMapPin } from "@/lib/news-types";
 
 export type MapJobHit = {
   id: string;
@@ -17,6 +25,11 @@ export type MapJobHit = {
   payLabel?: string;
   transitAccessible: boolean;
   commuteMinutes?: number;
+  commuteMode?: "transit" | "drive";
+  distanceKm?: number;
+  walkMinutes?: number;
+  transfers?: number;
+  fitScore?: number;
   applicationUrl?: string;
 };
 
@@ -27,12 +40,17 @@ export type LocalMapAnswer = {
   stats: {
     total: number;
     transitCount: number;
+    healthyCount: number;
     liveCount?: number;
+    filteredByCommute?: number;
   };
   transitNote?: string;
+  healthNote?: string;
   mapActions: MapAction[];
   source: "live-fallback";
   countyFocus?: CountyFocusSnapshot;
+  bizStories?: AreaNewsItem[];
+  bizMapPins?: LocalNewsMapPin[];
 };
 
 function payLabel(job: {
@@ -43,7 +61,9 @@ function payLabel(job: {
   if (!job.payMin && !job.payMax) return undefined;
   const val = job.payMin ?? job.payMax!;
   if (job.payType === "hourly") return `$${val.toFixed(0)}/hr`;
-  return `$${Math.round(val / 1000)}k/yr`;
+  const thousands = Math.round(val / 1000);
+  if (thousands <= 0) return undefined;
+  return `$${thousands}k/yr`;
 }
 
 export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<LocalMapAnswer | null> {
@@ -52,11 +72,46 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
   let liveCount = 0;
   let metaMessage: string | undefined;
   let countyFocus: CountyFocusSnapshot | undefined;
+  let bizStories: AreaNewsItem[] = [];
+  let bizMapPins: LocalNewsMapPin[] = [];
+
+  const newsCountyId =
+    intent.flyToCountyId ??
+    (intent.searchJobs?.location
+      ? matchCityInText(intent.searchJobs.location.toLowerCase())?.countyId
+      : undefined);
+
+  if (intent.bizJournalNews || intent.searchJobs) {
+    try {
+      const qs = new URLSearchParams({ limit: "6" });
+      if (newsCountyId) qs.set("county", newsCountyId);
+      if (intent.bizJournalNews) qs.set("development", "1");
+      const res = await fetch(`/api/news?${qs}`);
+      if (res.ok) {
+        const payload = (await res.json()) as {
+          data: AreaNewsItem[];
+          mapPins: LocalNewsMapPin[];
+          bizJournalItems?: AreaNewsItem[];
+        };
+        bizStories =
+          payload.bizJournalItems?.length
+            ? payload.bizJournalItems
+            : payload.data.filter((i) => i.source === "biz-journal");
+        if (bizStories.length) {
+          const pinIds = new Set(bizStories.map((s) => s.id));
+          bizMapPins = payload.mapPins.filter((p) => pinIds.has(p.id));
+        }
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   if (intent.searchJobs) {
     try {
       const qs = new URLSearchParams();
       if (intent.searchJobs.keyword) qs.set("q", intent.searchJobs.keyword);
+      if (intent.searchJobs.location) qs.set("location", intent.searchJobs.location);
       if (intent.searchJobs.transitOnly) qs.set("transit", "true");
       if (intent.searchJobs.maxCommute) qs.set("maxCommute", String(intent.searchJobs.maxCommute));
       qs.set("rank", "true");
@@ -73,7 +128,14 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
           payMin?: number;
           payMax?: number;
           payType: string;
-          commute?: { durationMinutes: number };
+          commute?: {
+            durationMinutes: number;
+            mode?: "transit" | "drive";
+            distanceKm?: number;
+            walkMinutes?: number;
+            transfers?: number;
+          };
+          commuteFitScore?: number;
         }[];
         meta?: { liveCount?: number; userMessage?: string; status?: string };
       };
@@ -91,31 +153,44 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
           payLabel: payLabel(j),
           transitAccessible: Boolean(j.transitAccessible),
           commuteMinutes: j.commute?.durationMinutes,
+          commuteMode: j.commute?.mode,
+          distanceKm: j.commute?.distanceKm,
+          walkMinutes: j.commute?.walkMinutes,
+          transfers: j.commute?.transfers,
+          fitScore: j.commuteFitScore,
           applicationUrl: j.applicationUrl,
         }));
 
-        if (intent.searchJobs?.maxCommute && !intent.searchJobs.transitOnly) {
-          jobs.sort((a, b) => Number(b.transitAccessible) - Number(a.transitAccessible));
-        }
+        jobs.sort((a, b) => {
+          const aMin = a.commuteMinutes ?? 999;
+          const bMin = b.commuteMinutes ?? 999;
+          if (aMin !== bMin) return aMin - bMin;
+          return (b.fitScore ?? 0) - (a.fitScore ?? 0);
+        });
 
         if (raw.length) {
           actions.push({
             type: "setMarkers",
-            markers: raw.map((j) => ({
-              id: j.id,
-              coordinates: j.location.coordinates,
-              label: `${j.title} · ${j.employer}`,
-              color: j.transitAccessible ? "#1e6b9c" : "#d4824a",
-            })),
+            markers: raw.map((j) => {
+              const hit = jobs.find((h) => h.id === j.id);
+              return {
+                id: j.id,
+                coordinates: j.location.coordinates,
+                label: `${j.title} · ${j.employer}`,
+                color: markerColorForJob(hit?.commuteMinutes),
+              };
+            }),
           });
-          const avgLat = raw.reduce((s, j) => s + j.location.coordinates.lat, 0) / raw.length;
-          const avgLng = raw.reduce((s, j) => s + j.location.coordinates.lng, 0) / raw.length;
-          actions.push({
-            type: "flyTo",
-            center: { lat: avgLat, lng: avgLng },
-            zoom: intent.searchJobs.transitOnly ? 10.5 : 9,
-            pitch: 32,
-          });
+          if (!intent.flyToCountyId) {
+            const avgLat = raw.reduce((s, j) => s + j.location.coordinates.lat, 0) / raw.length;
+            const avgLng = raw.reduce((s, j) => s + j.location.coordinates.lng, 0) / raw.length;
+            actions.push({
+              type: "flyTo",
+              center: { lat: avgLat, lng: avgLng },
+              zoom: intent.searchJobs.transitOnly ? 10.5 : 9,
+              pitch: 32,
+            });
+          }
         }
       }
     } catch {
@@ -127,22 +202,61 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
     try {
       const res = await fetch("/api/economy");
       if (res.ok) {
-        const payload = (await res.json()) as { data: { counties: CountyEconomy[] } };
+        const payload = (await res.json()) as {
+          data: {
+            counties: CountyEconomy[];
+            unemploymentByFips?: Record<string, number>;
+            countyLabelsByFips?: Record<string, string>;
+          };
+          provenance?: { lastUpdated?: string };
+        };
         const counties = payload.data.counties ?? [];
-        const { values, labels } = choroplethFromCounties(intent.metric, counties);
-        actions.push({
-          type: "setChoropleth",
-          metric: intent.metric,
-          values,
-          labels,
-        });
+        let unemploymentByFips = payload.data.unemploymentByFips ?? {};
+        let countyLabelsByFips = payload.data.countyLabelsByFips ?? {};
+        const dataAsOf = payload.provenance?.lastUpdated;
+
+        if (intent.metric === "unemployment" && Object.keys(unemploymentByFips).length === 0) {
+          const mapRes = await fetch("/api/economy/map");
+          if (mapRes.ok) {
+            const mapPayload = (await mapRes.json()) as {
+              data?: {
+                unemploymentByFips?: Record<string, number>;
+                countyLabelsByFips?: Record<string, string>;
+              };
+            };
+            unemploymentByFips = mapPayload.data?.unemploymentByFips ?? {};
+            countyLabelsByFips = mapPayload.data?.countyLabelsByFips ?? countyLabelsByFips;
+          }
+        }
+
+        if (intent.metric === "unemployment" && Object.keys(unemploymentByFips).length > 0) {
+          actions.push({
+            type: "setChoropleth",
+            metric: "unemployment",
+            values: unemploymentByFips,
+            labels: countyLabelsByFips,
+          });
+        } else {
+          const { values, labels } = choroplethFromCounties(intent.metric, counties);
+          actions.push({
+            type: "setChoropleth",
+            metric: intent.metric,
+            values,
+            labels,
+          });
+        }
 
         const focusId =
           intent.flyToCountyId ??
           intent.highlightCountyIds?.[0] ??
           undefined;
         if (focusId) {
-          countyFocus = buildCountyFocus(counties, focusId, intent.metric) ?? undefined;
+          countyFocus =
+            buildCountyFocus(counties, focusId, intent.metric, {
+              unemploymentByFips,
+              sources: getMetricSources(intent.metric),
+              dataAsOf,
+            }) ?? undefined;
           actions.push({ type: "highlightCounties", countyIds: [focusId] });
         }
       }
@@ -156,17 +270,20 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
   }
 
   if (intent.flyToCountyId) {
-    const { WI_COUNTIES } = await import("@/lib/wi-counties");
-    const county = WI_COUNTIES.find((c) => c.id === intent.flyToCountyId);
-    if (county) {
-      if (!actions.some((a) => a.type === "flyTo")) {
-        actions.push({
-          type: "flyTo",
-          center: { lat: county.lat, lng: county.lng },
-          zoom: intent.metric ? 9.25 : intent.searchJobs?.transitOnly ? 10.5 : 8.5,
-          pitch: 34,
-        });
-      }
+    const coords = getCountyCoordinates(intent.flyToCountyId);
+    if (coords) {
+      actions.push({
+        type: "flyTo",
+        center: coords,
+        zoom: intent.searchJobs
+          ? intent.searchJobs.transitOnly
+            ? 10.5
+            : 10.25
+          : intent.metric
+            ? 8.15
+            : 9,
+        pitch: 34,
+      });
       if (!intent.metric && !intent.highlightCountyIds?.length) {
         actions.push({ type: "highlightCounties", countyIds: [intent.flyToCountyId] });
       }
@@ -183,69 +300,83 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
     actions.push({ type: "flyTo", center, zoom: 10, pitch: 28 });
   }
 
-  if (!jobs.length && !intent.metric && actions.length === 0) return null;
+  if (!jobs.length && !intent.metric && actions.length === 0 && !bizStories.length) return null;
 
   const transitCount = jobs.filter((j) => j.transitAccessible).length;
+  const healthyCount = jobs.filter(
+    (j) => j.commuteMinutes != null && classifyCommute(j.commuteMinutes) !== "unhealthy"
+  ).length;
   const keyword = intent.searchJobs?.keyword;
   const place =
-    intent.flyToCountyId === "milwaukee"
-      ? "Milwaukee"
-      : intent.flyToCountyId === "dane"
-        ? "Madison"
-        : "Wisconsin";
+    intent.searchJobs?.location ??
+    (intent.flyToCountyId
+      ? userAreaFromCountyId(intent.flyToCountyId).displayName
+      : undefined) ??
+    "Wisconsin";
 
   let headline: string;
   let subline: string | undefined;
   let transitNote: string | undefined;
+  let healthNote: string | undefined = COMMUTE_POLICY.researchNote;
 
-  if (jobs.length) {
-    const role = keyword ? keyword.toUpperCase() : "job";
-    const busRequested = Boolean(intent.searchJobs?.maxCommute);
-    if (busRequested) {
-      headline = `${jobs.length} ${role} opening${jobs.length === 1 ? "" : "s"} near ${place}`;
-      subline =
-        transitCount > 0
-          ? `${transitCount} with strong bus reach · blue pins on the map`
-          : `${jobs.length} live listing${jobs.length === 1 ? "" : "s"} — MCTS serves Milwaukee County`;
-      transitNote =
-        intent.transitMetro === "milwaukee" || intent.flyToCountyId === "milwaukee"
-          ? "Tip: MCTS Trip Planner can route you from home to each pin. Blue badges = closest to transit."
-          : "Listings sorted with transit-friendly roles first where available.";
-    } else if (intent.searchJobs?.transitOnly) {
-      headline = `${jobs.length} ${role} opening${jobs.length === 1 ? "" : "s"} on transit near ${place}`;
-      subline =
-        transitCount > 0
-          ? `${transitCount} pinned on the map with MCTS-friendly reach`
-          : "Blue pins = transit-accessible · orange = further out";
-      transitNote =
-        intent.transitMetro === "milwaukee" || intent.flyToCountyId === "milwaukee"
-          ? "MCTS buses cover Milwaukee County — tap a pin for employer and pay."
-          : "Pins show live listings filtered for transit reach.";
-    } else {
-      headline = `${jobs.length} live ${keyword ?? "job"} listing${jobs.length === 1 ? "" : "s"} near ${place}`;
-      subline = liveCount ? `${liveCount} pulled from Adzuna · tap pins on the map` : undefined;
+  if (metaMessage && jobs.length === 0 && intent.searchJobs) {
+    headline = `Jobs near ${place}`;
+    subline = metaMessage;
+    healthNote = undefined;
+  } else if (jobs.length) {
+    const role = keyword ?? "job";
+    headline = `${jobs.length} ${role} role${jobs.length === 1 ? "" : "s"} within reach of ${place}`;
+    subline =
+      healthyCount === jobs.length
+        ? `All within a ${COMMUTE_POLICY.recommendedMaxMinutes}-minute commute — sorted closest first`
+        : `${healthyCount} within healthy commute range · closest roles first`;
+    if (transitCount > 0) {
+      transitNote = `${transitCount} reachable by transit where GTFS data exists. Green pins = ≤30 min · teal = ≤45 min.`;
+    } else if (intent.searchJobs?.location) {
+      transitNote = `Drive-time estimates from ${place}. Roles beyond ${COMMUTE_POLICY.searchRadiusKm} km are excluded.`;
     }
   } else if (metaMessage) {
     headline = metaMessage;
+    healthNote = undefined;
   } else if (countyFocus) {
     headline = headlineForCountyMetric(countyFocus);
-    subline = `Hover counties on the map · ${countyFocus.vitals.length} live stats for ${countyFocus.countyName}`;
+    subline = `${formatRankContext(countyFocus)} · ${formatStateAvgLabel(countyFocus)}`;
+  } else if (bizStories.length) {
+    headline = `Business & job growth near ${place}`;
+    subline = `${bizStories.length} stor${bizStories.length === 1 ? "y" : "ies"} from Wisconsin business journals`;
   } else if (intent.metric) {
     headline = `Mapped ${intent.metric.replace("-", " ")} across Wisconsin`;
   } else {
     return null;
   }
 
+  if (jobs.length && bizStories.length) {
+    subline = [subline, `${bizStories.length} regional business journal headline${bizStories.length === 1 ? "" : "s"} below`]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
   return {
     headline,
     subline,
     jobs,
-    stats: { total: jobs.length, transitCount, liveCount },
+    stats: { total: jobs.length, transitCount, healthyCount, liveCount },
     transitNote,
+    healthNote,
     mapActions: actions,
     source: "live-fallback",
     countyFocus,
+    bizStories: bizStories.length ? bizStories : undefined,
+    bizMapPins: bizMapPins.length ? bizMapPins : undefined,
   };
+}
+
+function markerColorForJob(minutes?: number): string {
+  if (minutes == null) return "#6366f1";
+  const tier = classifyCommute(minutes);
+  if (tier === "excellent") return "#267a55";
+  if (tier === "good") return "#1e6b9c";
+  return "#d4824a";
 }
 
 /** @deprecated use buildLocalMapAnswer */

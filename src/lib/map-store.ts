@@ -9,6 +9,20 @@ import type {
 } from "@/lib/agent/map-actions";
 import type { AreaSentimentSnapshot, LocalNewsMapPin } from "@/lib/news-types";
 
+export type SelectedCounty = {
+  fips: string;
+  name: string;
+  countyId: string;
+};
+
+export type MapDemographics = {
+  populationByFips: Record<string, number>;
+  populationEstimateByFips: Record<string, boolean>;
+  laborForceByFips: Record<string, number>;
+  medianIncomeByFips: Record<string, number>;
+  unemploymentByFips: Record<string, number>;
+};
+
 type MapState = {
   center: Coordinates;
   zoom: number;
@@ -33,6 +47,8 @@ type MapState = {
   localNewsPins: LocalNewsMapPin[];
   areaSentiment: AreaSentimentSnapshot | null;
   localMapAnswer: import("@/lib/agent/local-map-answer").LocalMapAnswer | null;
+  selectedCounty: SelectedCounty | null;
+  mapDemographics: MapDemographics;
   setAnswerPin: (
     pin: { countyId: string; countyName: string; headline: string } | null
   ) => void;
@@ -42,6 +58,9 @@ type MapState = {
   ) => void;
   clearLocalNewsLayer: () => void;
   setLocalMapAnswer: (answer: import("@/lib/agent/local-map-answer").LocalMapAnswer | null) => void;
+  setMapDemographics: (data: Partial<MapDemographics>) => void;
+  selectCounty: (county: SelectedCounty | null) => void;
+  clearSelectedCounty: () => void;
   applyAction: (action: MapAction) => void;
   applyActions: (actions: MapAction[]) => void;
   resetMap: () => void;
@@ -72,6 +91,14 @@ const initialState = {
   localNewsPins: [] as LocalNewsMapPin[],
   areaSentiment: null as AreaSentimentSnapshot | null,
   localMapAnswer: null as import("@/lib/agent/local-map-answer").LocalMapAnswer | null,
+  selectedCounty: null as SelectedCounty | null,
+  mapDemographics: {
+    populationByFips: {},
+    populationEstimateByFips: {},
+    laborForceByFips: {},
+    medianIncomeByFips: {},
+    unemploymentByFips: {},
+  } as MapDemographics,
 };
 
 export const useMapStore = create<MapState>((set, get) => ({
@@ -85,6 +112,40 @@ export const useMapStore = create<MapState>((set, get) => ({
   clearLocalNewsLayer: () => set({ localNewsPins: [], areaSentiment: null }),
 
   setLocalMapAnswer: (answer) => set({ localMapAnswer: answer }),
+
+  setMapDemographics: (data) =>
+    set((s) => ({
+      mapDemographics: {
+        populationByFips: data.populationByFips
+          ? { ...s.mapDemographics.populationByFips, ...data.populationByFips }
+          : s.mapDemographics.populationByFips,
+        populationEstimateByFips: data.populationEstimateByFips
+          ? { ...s.mapDemographics.populationEstimateByFips, ...data.populationEstimateByFips }
+          : s.mapDemographics.populationEstimateByFips,
+        laborForceByFips: data.laborForceByFips
+          ? { ...s.mapDemographics.laborForceByFips, ...data.laborForceByFips }
+          : s.mapDemographics.laborForceByFips,
+        medianIncomeByFips: data.medianIncomeByFips
+          ? { ...s.mapDemographics.medianIncomeByFips, ...data.medianIncomeByFips }
+          : s.mapDemographics.medianIncomeByFips,
+        unemploymentByFips: data.unemploymentByFips
+          ? { ...s.mapDemographics.unemploymentByFips, ...data.unemploymentByFips }
+          : s.mapDemographics.unemploymentByFips,
+      },
+    })),
+
+  selectCounty: (county) => {
+    if (!county) {
+      set({ selectedCounty: null });
+      return;
+    }
+    set({
+      selectedCounty: county,
+      highlightedCounties: [county.countyId],
+    });
+  },
+
+  clearSelectedCounty: () => set({ selectedCounty: null, highlightedCounties: [] }),
 
   applyAction: (action) => {
     switch (action.type) {

@@ -1,7 +1,10 @@
 import { WI_COUNTIES } from "@/lib/wi-counties";
+import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
+import { countyIdFromFips, getCountyCoordinates } from "@/lib/county-lookup";
+import { WI_COUNTY_CENTROIDS } from "@/data/wi-county-centroids";
 import { metroRegions } from "@/data/mock/economy";
 
-export type UserAreaSource = "home" | "saved" | "browser" | "ip" | "default";
+export type UserAreaSource = "home" | "saved" | "browser" | "ip" | "default" | "manual";
 
 export type UserArea = {
   countyId: string;
@@ -30,7 +33,7 @@ export function isInWisconsin(lat: number, lng: number): boolean {
   );
 }
 
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
   const dLng = ((b.lng - a.lng) * Math.PI) / 180;
@@ -99,7 +102,35 @@ const CITY_TO_COUNTY: Record<string, string> = {
   oshkosh: "winnebago",
   "eau claire": "eau-claire",
   wausau: "marathon",
+  "la crosse": "la-crosse",
+  sheboygan: "sheboygan",
+  "fond du lac": "fond-du-lac",
+  janesville: "rock",
+  beloit: "rock",
+  manitowoc: "manitowoc",
+  superior: "douglas",
+  "stevens point": "portage",
+  "wisconsin dells": "columbia",
+  "door county": "door",
+  "st. croix": "st-croix",
+  "st croix": "st-croix",
+  "lake geneva": "walworth",
 };
+
+/** Match Wisconsin city names in free text (longest label first). */
+export function matchCityInText(text: string): { countyId: string; cityLabel: string } | null {
+  const lower = text.toLowerCase();
+  const entries = Object.entries(CITY_TO_COUNTY).sort((a, b) => b[0].length - a[0].length);
+  for (const [label, countyId] of entries) {
+    if (!lower.includes(label)) continue;
+    const cityLabel = label
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    return { countyId, cityLabel };
+  }
+  return null;
+}
 
 export function resolveAreaFromCityLabel(
   city?: string | null,
@@ -110,18 +141,15 @@ export function resolveAreaFromCityLabel(
 
   for (const [label, countyId] of Object.entries(CITY_TO_COUNTY)) {
     if (!blob.includes(label)) continue;
-    const county = WI_COUNTIES.find((c) => c.id === countyId);
-    if (!county) continue;
-    const metro =
-      metroRegions.find((m) => m.id === county.id)?.name ??
-      `${county.name.replace(" County", "")} area`;
+    const area = userAreaFromCountyId(countyId);
+    if (area.countyId === DEFAULT_USER_AREA.countyId && countyId !== "milwaukee") continue;
     return {
-      countyId: county.id,
-      countyName: county.name,
-      metroName: metro,
-      displayName: county.name.replace(" County", ""),
-      lat: county.lat,
-      lng: county.lng,
+      countyId: area.countyId,
+      countyName: area.countyName,
+      metroName: area.metroName,
+      displayName: area.displayName,
+      lat: area.lat,
+      lng: area.lng,
     };
   }
   return null;
@@ -174,6 +202,58 @@ export const DEFAULT_USER_AREA: UserArea = {
   source: "default",
   inWisconsin: true,
 };
+
+/** Build a UserArea from any Wisconsin county id (featured or slug). */
+export function userAreaFromCountyId(countyId: string): UserArea {
+  const featured = WI_COUNTIES.find((c) => c.id === countyId);
+  if (featured) {
+    const metro =
+      metroRegions.find((m) => m.id === featured.id)?.name ??
+      `${featured.name.replace(" County", "")} area`;
+    return {
+      countyId: featured.id,
+      countyName: featured.name,
+      metroName: metro,
+      displayName: featured.name.replace(" County", ""),
+      lat: featured.lat,
+      lng: featured.lng,
+      source: "manual",
+      inWisconsin: true,
+    };
+  }
+
+  for (const [fullName, fips] of Object.entries(WI_COUNTY_NAME_TO_FIPS)) {
+    if (countyIdFromFips(fips) !== countyId) continue;
+    const centroid = WI_COUNTY_CENTROIDS[fips];
+    const short = fullName.replace(/ County$/, "");
+    return {
+      countyId,
+      countyName: fullName,
+      metroName: `${short} area`,
+      displayName: short,
+      lat: centroid?.lat ?? 44.5,
+      lng: centroid?.lng ?? -89.5,
+      source: "manual",
+      inWisconsin: true,
+    };
+  }
+
+  const coords = getCountyCoordinates(countyId);
+  if (coords) {
+    return {
+      countyId,
+      countyName: `${countyId} County`,
+      metroName: `${countyId} area`,
+      displayName: countyId,
+      lat: coords.lat,
+      lng: coords.lng,
+      source: "manual",
+      inWisconsin: true,
+    };
+  }
+
+  return DEFAULT_USER_AREA;
+}
 
 /** Match insights / news to a county or metro label */
 export function areaMatchesRegion(area: UserArea, region?: string | null): boolean {

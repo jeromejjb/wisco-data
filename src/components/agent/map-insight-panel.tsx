@@ -52,11 +52,11 @@ export function MapInsightPanel({ className, compact, showLegend = true }: MapIn
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="rounded-xl border border-lake-500/15 bg-gradient-to-br from-lake-50/90 to-white p-3.5 dark:from-navy-900/60 dark:to-navy-950/40">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-lake-600 dark:text-lake-400">
+      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-3.5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-300/80">
           {METRIC_LABELS[choroplethMetric]}
         </p>
-        <p className="mt-1 font-display text-[15px] font-semibold leading-snug text-[#0c1222] dark:text-white">
+        <p className="mt-1 font-display text-[15px] font-semibold leading-snug text-white">
           {METRIC_HEADLINES[choroplethMetric]}
         </p>
         {!compact && (
@@ -104,9 +104,9 @@ function StatPill({
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px]",
-        tone === "high" && "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
-        tone === "low" && "bg-amber-500/10 text-amber-900 dark:text-amber-200",
-        !tone && "bg-black/[0.04] text-[#3d4659] dark:bg-white/5 dark:text-white/70"
+        tone === "high" && "bg-emerald-500/10 text-emerald-300",
+        tone === "low" && "bg-amber-500/10 text-amber-200",
+        !tone && "bg-white/5 text-white/70"
       )}
     >
       <span className="font-medium opacity-70">{label}</span>

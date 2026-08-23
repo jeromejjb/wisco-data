@@ -17,11 +17,15 @@ export function JobsStatusBanner({ meta, className }: JobsStatusBannerProps) {
   }
 
   const activeErrors = meta.errors.filter((e) => e.code !== "not_configured");
+  const rateLimited = activeErrors.filter((e) => e.code === "rate_limited");
+  const allFailedAreRateLimited =
+    activeErrors.length > 0 && rateLimited.length === activeErrors.length;
+
   if (meta.status === "failed" && meta.userMessage) {
     return (
       <StatusAlert
-        variant="error"
-        title="Could not load live jobs"
+        variant={allFailedAreRateLimited ? "info" : "error"}
+        title={allFailedAreRateLimited ? "Job sources cooling down" : "Could not load live jobs"}
         message={meta.userMessage}
         className={className}
       />
@@ -29,10 +33,14 @@ export function JobsStatusBanner({ meta, className }: JobsStatusBannerProps) {
   }
 
   if (meta.status === "partial" && activeErrors.length > 0) {
+    const partialRateLimited =
+      rateLimited.length > 0 && rateLimited.length === activeErrors.length;
     return (
       <StatusAlert
-        variant="warning"
-        title="Some job sources unavailable"
+        variant={partialRateLimited ? "info" : "warning"}
+        title={
+          partialRateLimited ? "Some job sources are resting" : "Some job sources unavailable"
+        }
         message={meta.userMessage ?? activeErrors.map((e) => e.userMessage).join(" ")}
         className={className}
       />

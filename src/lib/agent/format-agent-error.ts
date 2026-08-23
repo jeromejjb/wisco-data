@@ -1,12 +1,20 @@
+import { agentRateLimitCopy, isRateLimitError } from "@/lib/rate-limit-messages";
+
 export function formatAgentError(error: Error | undefined): {
   title: string;
   detail: string;
+  fallbackNote: string;
   canUseLiveData: boolean;
+  isRateLimited?: boolean;
+  retryAfterMinutes?: number;
 } {
+  const fallbackNote = "Live map data is shown below.";
+
   if (!error) {
     return {
       title: "Something went wrong",
       detail: "Try again in a moment.",
+      fallbackNote,
       canUseLiveData: true,
     };
   }
@@ -17,20 +25,20 @@ export function formatAgentError(error: Error | undefined): {
     return {
       title: "AI assistant unavailable",
       detail: "We're still pulling live Wisconsin data for you on the map.",
+      fallbackNote,
       canUseLiveData: true,
     };
   }
 
-  if (
-    msg.includes("quota") ||
-    msg.includes("rate limit") ||
-    msg.includes("an error occurred") ||
-    msg.includes("429")
-  ) {
+  if (isRateLimitError(msg)) {
+    const rateLimit = agentRateLimitCopy(error.message);
     return {
-      title: "AI is catching its breath",
-      detail: "Rate limit hit — your live job and map results are still loading below.",
+      title: rateLimit.title,
+      detail: rateLimit.detail,
+      fallbackNote,
       canUseLiveData: true,
+      isRateLimited: true,
+      retryAfterMinutes: rateLimit.retryAfterMinutes,
     };
   }
 
@@ -38,6 +46,7 @@ export function formatAgentError(error: Error | undefined): {
     return {
       title: "Connection hiccup",
       detail: "Check your network — we'll keep trying with live data sources.",
+      fallbackNote,
       canUseLiveData: true,
     };
   }
@@ -45,6 +54,7 @@ export function formatAgentError(error: Error | undefined): {
   return {
     title: "Couldn't reach the assistant",
     detail: "Live map data may still answer your question — see the results card.",
+    fallbackNote,
     canUseLiveData: true,
   };
 }

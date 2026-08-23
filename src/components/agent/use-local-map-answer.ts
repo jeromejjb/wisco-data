@@ -6,6 +6,7 @@ import { extractMapActionsFromOutput } from "@/lib/agent/map-actions";
 import { getMessageText } from "@/lib/agent/chat-display";
 import { inferMapQueryIntent } from "@/lib/agent/map-query-intent";
 import { buildLocalMapAnswer } from "@/lib/agent/local-map-answer";
+import { applyQueryAreaSync } from "@/lib/query-area-sync";
 import { useMapStore } from "@/lib/map-store";
 
 type ToolPart = {
@@ -66,9 +67,18 @@ export function useLocalMapAnswer(
     const intent = inferMapQueryIntent(getMessageText(lastUser));
     if (!intent) return;
 
+    applyQueryAreaSync(getMessageText(lastUser));
+
     const usedTools = assistantUsedMapTools(messages);
     const hasText = assistantHasText(messages);
-    const shouldRun = Boolean(error) || !hasText || !usedTools;
+    const shouldRun =
+      Boolean(error) ||
+      !hasText ||
+      !usedTools ||
+      Boolean(intent.searchJobs) ||
+      Boolean(intent.bizJournalNews) ||
+      Boolean(intent.flyToCountyId) ||
+      Boolean(intent.metric);
     if (!shouldRun) return;
 
     processedTurnRef.current = turnKey;
@@ -78,8 +88,11 @@ export function useLocalMapAnswer(
       setLocalMapAnswer(answer);
       if (answer.mapActions.length) {
         applyActions(answer.mapActions);
-        onAppliedRef.current?.();
       }
+      if (answer.bizMapPins?.length) {
+        useMapStore.getState().setLocalNewsLayer(answer.bizMapPins, null);
+      }
+      onAppliedRef.current?.();
     });
   }, [messages, status, error, applyActions, setLocalMapAnswer]);
 }

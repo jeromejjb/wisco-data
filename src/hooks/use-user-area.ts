@@ -16,6 +16,7 @@ type LocationMeta = {
 };
 
 export function useUserArea() {
+  const chosenArea = useAppStore((s) => s.chosenArea);
   const homeLocation = useAppStore((s) => s.homeLocation);
   const savedPlaces = useAppStore((s) => s.savedPlaces);
   const detectedArea = useAppStore((s) => s.detectedArea);
@@ -147,7 +148,11 @@ export function useUserArea() {
     setDetectedArea,
   ]);
 
-  const area = locationPromptsEnabled ? (detectedArea ?? DEFAULT_USER_AREA) : DEFAULT_USER_AREA;
+  const area = chosenArea
+    ? chosenArea
+    : locationPromptsEnabled
+      ? (detectedArea ?? DEFAULT_USER_AREA)
+      : DEFAULT_USER_AREA;
 
-  return { area, meta, loading, locationPromptsEnabled };
+  return { area, meta, loading, locationPromptsEnabled, chosenArea };
 }

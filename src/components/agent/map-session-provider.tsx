@@ -18,11 +18,13 @@ import type { ChatStarter } from "@/lib/agent/chat-starters";
 import type { AreaSentimentSnapshot, LocalNewsMapPin } from "@/lib/news-types";
 import { formatAssistantChatText, getMessageText } from "@/lib/agent/chat-display";
 import { useLocalPrompts } from "@/hooks/use-local-prompts";
-import { useLocalMapAnswer } from "./use-local-map-answer";
+import { useSyncQueryArea } from "@/hooks/use-sync-query-area";
 import { AgentMapBridge } from "./agent-map-bridge";
+import { useLocalMapAnswer } from "./use-local-map-answer";
 import { useMapStore } from "@/lib/map-store";
-import { WI_COUNTIES } from "@/lib/wi-counties";
 import { countiesFromText } from "@/lib/agent/map-query-intent-utils";
+import { inferMapQueryIntent } from "@/lib/agent/map-query-intent";
+import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
 import { formatAgentError } from "@/lib/agent/format-agent-error";
 import type { LocalMapAnswer } from "@/lib/agent/local-map-answer";
 
@@ -95,6 +97,7 @@ function syncAnswerPin(
   }
   const countyId =
     useMapStore.getState().highlightedCounties[0] ??
+    matchCityInText(question)?.countyId ??
     countiesFromText(question)[0] ??
     (area.source !== "default" ? area.countyId : null);
 
@@ -102,12 +105,11 @@ function syncAnswerPin(
     setAnswerPin(null);
     return;
   }
-  const county = WI_COUNTIES.find((c) => c.id === countyId);
-  if (!county) return;
+  const areaForPin = userAreaFromCountyId(countyId);
 
   setAnswerPin({
-    countyId,
-    countyName: county.name.replace(" County", ""),
+    countyId: areaForPin.countyId,
+    countyName: areaForPin.displayName,
     headline: answer || (isLoading ? loadingHeadline : ""),
   });
 }
@@ -155,14 +157,22 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const { messages, sendMessage, status, error } = useChat<WorkwaysAgentMessage>({ transport });
+  useSyncQueryArea(messages);
   const isLoading = status === "streaming" || status === "submitted";
   const lastMessage = messages[messages.length - 1];
   const isStreamingAssistant = isLoading && lastMessage?.role === "assistant";
 
   const answer = latestAssistantAnswer(messages);
   const localMapAnswer = useMapStore((s) => s.localMapAnswer);
-  const displayAnswer = answer || localMapAnswer?.headline || "";
   const question = latestUserQuestion(messages);
+  const queryIntent = useMemo(() => inferMapQueryIntent(question), [question]);
+  const displayAnswer =
+    (localMapAnswer && (queryIntent?.searchJobs || queryIntent?.bizJournalNews)
+      ? localMapAnswer.headline
+      : null) ||
+    answer ||
+    localMapAnswer?.headline ||
+    "";
   const hasAnswer = Boolean(displayAnswer) || isLoading;
   const showAnswerStack = hasAnswer && messages.length > 0;
 
@@ -177,8 +187,6 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   const onMapPainted = useCallback(() => {
     syncAnswerPin(question, displayAnswer, isLoading, area, loadingMessage);
   }, [question, displayAnswer, isLoading, area, loadingMessage]);
-
-  useLocalMapAnswer(messages, status, error, onMapPainted);
 
   useEffect(() => {
     syncAnswerPin(question, displayAnswer, isLoading, area, loadingMessage);
@@ -217,7 +225,29 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   return (
     <MapSessionContext.Provider value={value}>
       <AgentMapBridge messages={messages} onMapActionsApplied={onMapPainted} />
+      <LocalMapAnswerRunner
+        messages={messages}
+        status={status}
+        error={error}
+        onApplied={onMapPainted}
+      />
       {children}
     </MapSessionContext.Provider>
   );
+}
+
+/** Runs after AgentMapBridge so query location + live jobs override agent map actions. */
+function LocalMapAnswerRunner({
+  messages,
+  status,
+  error,
+  onApplied,
+}: {
+  messages: WorkwaysAgentMessage[];
+  status: string;
+  error: Error | undefined;
+  onApplied?: () => void;
+}) {
+  useLocalMapAnswer(messages, status, error, onApplied);
+  return null;
 }

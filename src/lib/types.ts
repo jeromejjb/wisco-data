@@ -67,6 +67,10 @@ export type CommuteSummary = {
   scheduleCompatible: boolean;
   scheduleNotes?: string;
   reliability: "high" | "medium" | "low";
+  /** How the estimate was derived */
+  mode?: "transit" | "drive";
+  /** Straight-line distance from search anchor or nearest stop (km) */
+  distanceKm?: number;
 };
 
 export type TransitRoute = {
@@ -98,6 +102,7 @@ export type CountyEconomy = {
   name: string;
   fips: string;
   coordinates: Coordinates;
+  population?: number;
   unemploymentRate: number;
   laborForceParticipation: number;
   openJobs: number;

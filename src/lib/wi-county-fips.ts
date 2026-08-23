@@ -72,3 +72,8 @@ export const WI_COUNTY_NAME_TO_FIPS: Record<string, string> = {
   'Brown County': '55009',
   'Waushara County': '55137',
 };
+
+/** Short display name (no " County" suffix) keyed by FIPS. */
+export const FIPS_TO_COUNTY_SHORT_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(WI_COUNTY_NAME_TO_FIPS).map(([name, fips]) => [fips, name.replace(/ County$/, "")])
+);

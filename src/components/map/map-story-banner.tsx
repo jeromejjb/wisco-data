@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChoroplethMetric } from "@/lib/agent/map-actions";
+import { fipsToSlug } from "@/lib/wi-counties";
 import { cn } from "@/lib/utils";
 
 const METRIC_HEADLINES: Record<ChoroplethMetric, string> = {
@@ -138,7 +139,11 @@ export function formatCountyDataValue(
   if (!metric) return null;
   const label = labels?.[fips];
   if (label) return label;
-  const val = values[fips];
+  let val = values[fips];
+  if (val === undefined) {
+    const slug = fipsToSlug(fips);
+    if (slug) val = values[slug];
+  }
   if (val === undefined) return null;
   return formatValue(metric, val);
 }

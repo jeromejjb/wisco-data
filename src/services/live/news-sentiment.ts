@@ -26,24 +26,27 @@ function heuristicSentiment(area: UserArea, items: AreaNewsItem[]): AreaSentimen
     score >= 0.35 ? "upbeat" : score <= -0.35 ? "concerned" : score >= 0.1 ? "mixed" : score <= -0.1 ? "cautious" : "mixed";
 
   const vibes: Record<NewsTone, string> = {
-    upbeat: "Optimistic pulse",
-    mixed: "Mixed signals",
-    cautious: "Watchful mood",
-    concerned: "Headwinds noted",
+    upbeat: "Mostly positive headlines",
+    mixed: "Mixed headlines",
+    cautious: "Some caution in the news",
+    concerned: "Challenging headlines",
   };
 
   const topics = [...new Set(items.map((i) => i.topic).filter(Boolean))].slice(0, 3) as string[];
+
+  const topTitle = items[0]?.title?.replace(/\s+/g, " ").trim();
 
   return {
     vibe: vibes[tone],
     score,
     tone,
-    oneLiner:
-      tone === "upbeat"
-        ? "Local headlines lean toward hiring and growth stories."
+    oneLiner: topTitle
+      ? `Recent stories include: “${topTitle.length > 72 ? `${topTitle.slice(0, 71)}…` : topTitle}”`
+      : tone === "upbeat"
+        ? "Recent coverage highlights hiring and growth."
         : tone === "concerned"
-          ? "Recent coverage highlights stress points in the area."
-          : "Headlines blend opportunity with open questions.",
+          ? "Recent coverage mentions layoffs, cuts, or local stress points."
+          : "Recent headlines cover both opportunities and open questions.",
     topics: topics.length ? topics : ["local"],
     areaName: area.displayName,
     source: "heuristic",

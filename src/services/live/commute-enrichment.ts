@@ -1,4 +1,5 @@
 import type { Job, CommuteSummary } from "@/lib/types";
+import { driveMinutesFromKm } from "@/lib/commute-policy";
 import { fetchGtfsStops } from "@/services/clients/gtfs";
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -28,16 +29,28 @@ function nearestStopDistanceKm(
   return best;
 }
 
-function estimateCommute(
+function isTransitMetroCity(city: string): boolean {
+  const c = city.toLowerCase();
+  return (
+    c.includes("milwaukee") ||
+    c.includes("madison") ||
+    c.includes("wauwatosa") ||
+    c.includes("west allis") ||
+    c.includes("verona") ||
+    c.includes("waukesha") ||
+    c.includes("greenfield") ||
+    c.includes("oak creek")
+  );
+}
+
+function estimateTransitCommute(
   job: Job,
   mctsStops: { lat: number; lng: number }[],
   madisonStops: { lat: number; lng: number }[]
 ): CommuteSummary {
   const city = job.location.city.toLowerCase();
   const stops =
-    city.includes("madison") || city.includes("verona")
-      ? madisonStops
-      : mctsStops;
+    city.includes("madison") || city.includes("verona") ? madisonStops : mctsStops;
 
   const distKm = nearestStopDistanceKm(
     job.location.coordinates.lat,
@@ -54,6 +67,8 @@ function estimateCommute(
       scheduleCompatible: false,
       scheduleNotes: distKm > 2 ? "Limited transit access to this location" : undefined,
       reliability: "low",
+      mode: "transit",
+      distanceKm: distKm === Infinity ? undefined : distKm,
     };
   }
 
@@ -68,6 +83,33 @@ function estimateCommute(
     fareEstimate: city.includes("madison") ? 2.0 : 2.25,
     scheduleCompatible: durationMinutes < 50,
     reliability: transfers === 0 ? "high" : "medium",
+    mode: "transit",
+    distanceKm: distKm,
+  };
+}
+
+function estimateDriveCommute(
+  job: Job,
+  searchAnchor: { lat: number; lng: number }
+): CommuteSummary {
+  const distKm = haversineKm(
+    job.location.coordinates.lat,
+    job.location.coordinates.lng,
+    searchAnchor.lat,
+    searchAnchor.lng
+  );
+  const durationMinutes = driveMinutesFromKm(distKm);
+
+  return {
+    durationMinutes,
+    walkMinutes: 0,
+    transfers: 0,
+    fareEstimate: 0,
+    scheduleCompatible: durationMinutes <= 45,
+    scheduleNotes: "Estimated drive time from your search area",
+    reliability: durationMinutes <= 30 ? "high" : durationMinutes <= 45 ? "medium" : "low",
+    mode: "drive",
+    distanceKm: distKm,
   };
 }
 
@@ -77,20 +119,40 @@ function commuteFitScore(commute: CommuteSummary, payMin?: number, payType?: str
   const timeScore = Math.max(0, 40 - commute.durationMinutes * 0.6);
   const transferScore = Math.max(0, 15 - commute.transfers * 6);
   const scheduleScore = commute.scheduleCompatible ? 10 : -5;
-  return Math.round(Math.min(100, Math.max(20, payScore + timeScore + transferScore + scheduleScore)));
+  const healthBonus = commute.durationMinutes <= 30 ? 8 : commute.durationMinutes <= 45 ? 3 : -15;
+  return Math.round(
+    Math.min(100, Math.max(20, payScore + timeScore + transferScore + scheduleScore + healthBonus))
+  );
 }
 
-export async function enrichJobsWithCommuteEstimates(jobs: Job[]): Promise<Job[]> {
+export async function enrichJobsWithCommuteEstimates(
+  jobs: Job[],
+  options?: { searchAnchor?: { lat: number; lng: number } }
+): Promise<Job[]> {
   if (jobs.length === 0) return jobs;
 
   const [{ stops: mctsStops }, { stops: madisonStops }] = await Promise.all([
-    fetchGtfsStops("mcts", 350),
-    fetchGtfsStops("madison", 250),
+    fetchGtfsStops("mcts", { limit: 350 }),
+    fetchGtfsStops("madison", { limit: 250 }),
   ]);
 
   return jobs.map((job) => {
-    const commute = estimateCommute(job, mctsStops, madisonStops);
-    const transitAccessible = commute.walkMinutes <= 12 && commute.reliability !== "low";
+    const inTransitMetro = isTransitMetroCity(job.location.city);
+    const commute = inTransitMetro
+      ? estimateTransitCommute(job, mctsStops, madisonStops)
+      : options?.searchAnchor
+        ? estimateDriveCommute(job, options.searchAnchor)
+        : undefined;
+
+    if (!commute) {
+      return { ...job, transitAccessible: false, commuteFitScore: undefined };
+    }
+
+    const transitAccessible =
+      commute.mode === "transit" &&
+      commute.walkMinutes <= 12 &&
+      commute.reliability !== "low";
+
     return {
       ...job,
       commute,

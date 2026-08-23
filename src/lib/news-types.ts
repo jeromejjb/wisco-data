@@ -10,7 +10,8 @@ export type AreaNewsItem = {
   summary?: string;
   url?: string;
   publishedAt?: string;
-  source: "gnews" | "google-rss";
+  source: "gnews" | "google-rss" | "biz-journal";
+  publisher?: string;
   topic?: NewsTopic;
   tone?: NewsTone;
   countyId?: string;
@@ -44,9 +45,11 @@ export type AreaNewsBundle = {
   items: AreaNewsItem[];
   sentiment: AreaSentimentSnapshot | null;
   mapPins: LocalNewsMapPin[];
+  bizJournalItems?: AreaNewsItem[];
   meta: {
     sources: string[];
     gnewsConfigured: boolean;
     sentimentAvailable: boolean;
+    bizJournalSources?: string[];
   };
 };

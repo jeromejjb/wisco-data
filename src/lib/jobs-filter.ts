@@ -1,4 +1,5 @@
 import type { Job } from "@/lib/types";
+import { COMMUTE_POLICY, isRecommendableCommute } from "@/lib/commute-policy";
 
 export function filterJobs(
   jobs: Job[],
@@ -31,6 +32,11 @@ export function filterJobs(
     )
       return false;
     if (
+      job.commute &&
+      !isRecommendableCommute(job.commute.durationMinutes, filters.maxCommute ?? COMMUTE_POLICY.recommendedMaxMinutes)
+    )
+      return false;
+    if (
       filters.maxTransfers !== undefined &&
       job.commute &&
       job.commute.transfers > filters.maxTransfers
@@ -57,9 +63,16 @@ function computeReachScore(job: Job): number {
     job.payType === "hourly"
       ? ((job.payMin ?? 0) + (job.payMax ?? 0)) / 2 * 2080
       : ((job.payMin ?? 0) + (job.payMax ?? 0)) / 2;
-  const commutePenalty = job.commute ? job.commute.durationMinutes * 1.2 : 60;
+  const minutes = job.commute?.durationMinutes ?? 60;
+  const commutePenalty = minutes * 1.4;
   const transferPenalty = job.commute ? job.commute.transfers * 8 : 16;
   const scheduleBonus = job.commute?.scheduleCompatible ? 15 : -20;
   const ratingBonus = (job.employerRating ?? 3.5) * 5;
-  return pay / 1000 - commutePenalty - transferPenalty + scheduleBonus + ratingBonus;
+  const healthBonus =
+    minutes <= COMMUTE_POLICY.idealMaxMinutes
+      ? 20
+      : minutes <= COMMUTE_POLICY.recommendedMaxMinutes
+        ? 8
+        : -40;
+  return pay / 1000 - commutePenalty - transferPenalty + scheduleBonus + ratingBonus + healthBonus;
 }
