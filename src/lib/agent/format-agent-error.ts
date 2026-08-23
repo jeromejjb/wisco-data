@@ -1,4 +1,10 @@
-import { agentRateLimitCopy, isRateLimitError } from "@/lib/rate-limit-messages";
+import {
+  agentDailyQuotaCopy,
+  agentRateLimitCopy,
+  decodeAgentFailure,
+  isDailyQuotaError,
+  isRateLimitError,
+} from "@/lib/rate-limit-messages";
 
 export function formatAgentError(error: Error | undefined): {
   title: string;
@@ -19,7 +25,39 @@ export function formatAgentError(error: Error | undefined): {
     };
   }
 
+  const coded = decodeAgentFailure(error.message);
+  if (coded) {
+    if (coded.code === "quota-daily") {
+      const quota = agentDailyQuotaCopy();
+      return { ...quota, fallbackNote, canUseLiveData: true, isRateLimited: true };
+    }
+    if (coded.code === "rate-limit") {
+      const rateLimit = agentRateLimitCopy(
+        coded.retryAfterMinutes ? `retry-after: ${coded.retryAfterMinutes * 60}` : undefined
+      );
+      return {
+        title: rateLimit.title,
+        detail: rateLimit.detail,
+        fallbackNote,
+        canUseLiveData: true,
+        isRateLimited: true,
+        retryAfterMinutes: rateLimit.retryAfterMinutes,
+      };
+    }
+    return {
+      title: "AI assistant is resting",
+      detail: "It couldn't answer this one. The live map and jobs data below are unaffected — try again shortly.",
+      fallbackNote,
+      canUseLiveData: true,
+    };
+  }
+
   const msg = error.message.toLowerCase();
+
+  if (isDailyQuotaError(msg)) {
+    const quota = agentDailyQuotaCopy();
+    return { ...quota, fallbackNote, canUseLiveData: true, isRateLimited: true };
+  }
 
   if (msg.includes("503") || msg.includes("api key") || msg.includes("credentials")) {
     return {
@@ -52,8 +90,8 @@ export function formatAgentError(error: Error | undefined): {
   }
 
   return {
-    title: "Couldn't reach the assistant",
-    detail: "Live map data may still answer your question — see the results card.",
+    title: "AI assistant is resting",
+    detail: "It couldn't answer this one. The live map and jobs data below are unaffected — try again shortly.",
     fallbackNote,
     canUseLiveData: true,
   };

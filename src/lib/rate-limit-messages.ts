@@ -13,14 +13,64 @@ export function isRateLimitError(message: string): boolean {
 
 /** Parse Retry-After seconds from error text when present. */
 export function parseRetryAfterMinutes(message: string): number | undefined {
-  const headerMatch = message.match(/retry[- ]after[:\s]+(\d+)/i);
-  if (headerMatch) {
-    const seconds = Number.parseInt(headerMatch[1]!, 10);
+  // Matches both `retry-after: 90` headers and Gemini's `Please retry in 48.72s`.
+  const match = message.match(/retry[- ]after[:\s]+(\d+(?:\.\d+)?)/i) ?? message.match(/retry in\s+(\d+(?:\.\d+)?)\s*s/i);
+  if (match) {
+    const seconds = Number.parseFloat(match[1]!);
     if (Number.isFinite(seconds) && seconds > 0) {
       return Math.max(1, Math.ceil(seconds / 60));
     }
   }
   return undefined;
+}
+
+/**
+ * Wire format for agent failures. The AI SDK masks stream errors as
+ * "An error occurred." by default, so the route classifies server-side and
+ * sends one of these codes instead of leaking raw upstream error text.
+ */
+export type AgentFailureCode = "quota-daily" | "rate-limit" | "unavailable";
+
+export const AGENT_ERROR_PREFIX = "agent-error:";
+
+export function isDailyQuotaError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("per day") ||
+    lower.includes("perday") ||
+    lower.includes("free_tier_requests") ||
+    lower.includes("requests per day")
+  );
+}
+
+export function encodeAgentFailure(message: string): string {
+  if (isDailyQuotaError(message)) return `${AGENT_ERROR_PREFIX}quota-daily`;
+  if (isRateLimitError(message)) {
+    const minutes = parseRetryAfterMinutes(message);
+    return `${AGENT_ERROR_PREFIX}rate-limit${minutes ? `:${minutes}` : ""}`;
+  }
+  return `${AGENT_ERROR_PREFIX}unavailable`;
+}
+
+export function decodeAgentFailure(
+  message: string
+): { code: AgentFailureCode; retryAfterMinutes?: number } | undefined {
+  if (!message.startsWith(AGENT_ERROR_PREFIX)) return undefined;
+  const [code, minutes] = message.slice(AGENT_ERROR_PREFIX.length).split(":");
+  if (code !== "quota-daily" && code !== "rate-limit" && code !== "unavailable") return undefined;
+  const retryAfterMinutes = minutes ? Number.parseInt(minutes, 10) : undefined;
+  return {
+    code,
+    retryAfterMinutes: Number.isFinite(retryAfterMinutes) ? retryAfterMinutes : undefined,
+  };
+}
+
+export function agentDailyQuotaCopy(): { title: string; detail: string } {
+  return {
+    title: "Assistant is out of AI credits for today",
+    detail:
+      "The free daily AI allowance is used up — it resets tomorrow. Everything below is live map and jobs data, which still works normally.",
+  };
 }
 
 export function formatRetryWindow(minutes = DEFAULT_RETRY_MINUTES): string {

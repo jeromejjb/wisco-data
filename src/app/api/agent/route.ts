@@ -1,6 +1,7 @@
-import { createAgentUIStreamResponse } from "ai";
+import { createAgentUIStreamResponse, safeValidateUIMessages } from "ai";
 import { createWorkwaysAgent } from "@/lib/agent/workways-agent";
 import { hasAgentCredentials, resolveAgentModel } from "@/lib/agent/model";
+import { encodeAgentFailure } from "@/lib/rate-limit-messages";
 import { refreshStaleSources } from "@/services/live/refresh";
 import type { UserArea } from "@/lib/user-area";
 import type { AreaNewsItem } from "@/lib/agent/chat-starters";
@@ -66,8 +67,18 @@ export async function POST(req: Request) {
     contextLines.length ? contextLines.join("\n") : undefined
   );
 
+  const validated = await safeValidateUIMessages({ messages });
+  if (!validated.success) {
+    return Response.json({ error: validated.error.message }, { status: 400 });
+  }
+
   return createAgentUIStreamResponse({
     agent,
-    uiMessages: messages as import("ai").UIMessage[],
+    uiMessages: validated.data,
+    onError: (error) => {
+      const raw = error instanceof Error ? error.message : String(error);
+      console.error("Agent stream failed:", raw);
+      return encodeAgentFailure(raw);
+    },
   });
 }

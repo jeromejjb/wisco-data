@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, ChevronDown, Crosshair, RotateCcw, Check } from "lucide-react";
+import { MapPin, ChevronDown, Crosshair, RotateCcw, Check, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WI_COUNTIES } from "@/lib/wi-counties";
 import { userAreaFromCountyId, type UserArea } from "@/lib/user-area";
@@ -32,6 +32,8 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
   const chosenArea = useAppStore((s) => s.chosenArea);
   const setBrowserLocationEnabled = useAppStore((s) => s.setBrowserLocationEnabled);
   const browserLocationEnabled = useAppStore((s) => s.browserLocationEnabled);
+  const newsPromptsEnabled = useAppStore((s) => s.newsPromptsEnabled);
+  const setNewsPromptsEnabled = useAppStore((s) => s.setNewsPromptsEnabled);
   const applyActions = useMapStore((s) => s.applyActions);
 
   const label = area.displayName;
@@ -195,6 +197,38 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                     );
                   })}
                 </ul>
+
+                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-black/[0.05] px-3 py-2.5">
+                  <span className="flex items-center gap-2">
+                    <Newspaper
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        newsPromptsEnabled ? "text-amber-600" : "text-[#b0b8c8]"
+                      )}
+                    />
+                    <span className="text-[13px] text-[#3d4659]">Local news pins</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={newsPromptsEnabled}
+                    onChange={(e) => setNewsPromptsEnabled(e.target.checked)}
+                  />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
+                      newsPromptsEnabled ? "bg-[#1e6b9c]" : "bg-[#d6dbe4]"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-all",
+                        newsPromptsEnabled ? "left-4" : "left-[2px]"
+                      )}
+                    />
+                  </span>
+                </label>
 
                 <div className="flex gap-1 border-t border-black/[0.05] p-1.5">
                   <button

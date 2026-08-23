@@ -242,7 +242,6 @@ export function AgentMap({
   const [mapPulsing, setMapPulsing] = useState(false);
   const hasChoropleth =
     Boolean(choroplethMetric) && Object.keys(choroplethValues).length > 0;
-  const showCornerLegend = hasChoropleth && !localMapAnswer?.countyFocus;
 
   useEffect(() => {
     mapDemographicsRef.current = mapDemographics;
@@ -914,9 +913,6 @@ export function AgentMap({
           />
           <MapLegend metric={choroplethMetric} className="z-10" />
         </>
-      )}
-      {immersive && showCornerLegend && (
-        <MapLegend metric={choroplethMetric} className="z-10 !bottom-[7.5rem] !left-4" />
       )}
       {!immersive && overlayMode && (
         <MapBasemapSwitcher

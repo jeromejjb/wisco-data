@@ -145,9 +145,6 @@ export function MapChatWidget() {
           areaLoading={areaLoading}
           newsLoading={newsLoading}
           newsPromptsEnabled={newsPromptsEnabled}
-          onNewsToggle={setNewsPromptsEnabled}
-          browserLocationEnabled={browserLocationEnabled}
-          onBrowserLocationToggle={setBrowserLocationEnabled}
           onPick={pickStarter}
           disabled={isLoading}
           showCarousel={showPrompts}
