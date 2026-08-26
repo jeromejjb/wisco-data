@@ -35,6 +35,15 @@ describe("shouldStartFeature", () => {
     ).toMatchObject({ ok: false });
   });
 
+  it("skips night-shift issues so the implement agent owns the PR", () => {
+    expect(
+      shouldStartFeature({
+        state: "open",
+        labels: ["enhancement", "night-shift"],
+      })
+    ).toMatchObject({ ok: false });
+  });
+
   it("requires a feature or enhancement label", () => {
     expect(shouldStartFeature({ state: "open", labels: ["bug"] })).toMatchObject({
       ok: false,
