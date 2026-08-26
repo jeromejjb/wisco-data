@@ -415,6 +415,25 @@ body {
   scroll-padding-inline: 14px;
 }
 
+.raster-fallback-map,
+.raster-fallback-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #dbeafe;
+}
+.raster-fallback-map--dark .leaflet-container {
+  background: #0b1220;
+}
+.raster-fallback-map .leaflet-control-zoom a {
+  width: 2.25rem;
+  height: 2.25rem;
+  line-height: 2.25rem;
+  color: #0c1222;
+}
+.map-canvas--immersive .raster-fallback-map .leaflet-bottom {
+  margin-bottom: 7.5rem;
+}
+
 .map-canvas--immersive .maplibregl-canvas {
   cursor: grab;
 }

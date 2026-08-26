@@ -26,7 +26,7 @@ import {
 import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
 import { addWisconsinOutlineLayers, getStateOutlineGeoJson } from "@/lib/wi-state-outline";
 import { buildChoroplethExpression, fipsValuesFromCountyIds } from "./map-legend";
-import { MapWebGLUnavailable } from "./map-webgl-unavailable";
+import { RasterFallbackMap } from "./raster-fallback-map";
 import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
 
 const COUNTIES_SOURCE = "wi-counties";
@@ -231,11 +231,14 @@ export default function RealMap({
 
   return (
     <div className={cn("relative h-full min-h-[300px] w-full", className)}>
-      {webglProbe ? <MapWebGLUnavailable probe={webglProbe} /> : null}
-      <div
-        ref={containerRef}
-        className="h-full min-h-[300px] w-full overflow-hidden rounded-2xl bg-navy-900"
-      />
+      {webglProbe ? (
+        <RasterFallbackMap darkMode={darkMode} className="rounded-2xl" />
+      ) : (
+        <div
+          ref={containerRef}
+          className="h-full min-h-[300px] w-full overflow-hidden rounded-2xl bg-navy-900"
+        />
+      )}
     </div>
   );
 }

@@ -159,3 +159,32 @@ export function fipsValuesFromCountyIds(
   }
   return out;
 }
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = Number.parseInt(a.slice(1), 16);
+  const pb = Number.parseInt(b.slice(1), 16);
+  const ch = (shift: number) => {
+    const av = (pa >> shift) & 255;
+    const bv = (pb >> shift) & 255;
+    return Math.round(av + (bv - av) * t);
+  };
+  return `#${[ch(16), ch(8), ch(0)].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** CSS color for a metric value — used by the no-WebGL fallback map. */
+export function interpolateMetricColor(metric: ChoroplethMetric, value: number): string {
+  const stops = METRIC_STOPS[metric];
+  const first = stops[0]!;
+  const last = stops[stops.length - 1]!;
+  if (value <= first[0]) return first[1];
+  if (value >= last[0]) return last[1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [aVal, aColor] = stops[i]!;
+    const [bVal, bColor] = stops[i + 1]!;
+    if (value <= bVal) {
+      const t = (value - aVal) / (bVal - aVal || 1);
+      return mixHex(aColor, bColor, t);
+    }
+  }
+  return last[1];
+}
