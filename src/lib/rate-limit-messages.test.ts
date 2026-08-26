@@ -59,4 +59,12 @@ describe("formatAgentError", () => {
     expect(info.detail).toMatch(/back in about/i);
     expect(info.canUseLiveData).toBe(true);
   });
+
+  it("points at the map, not 'below', when live data answered", () => {
+    const info = formatAgentError(new Error("agent-error:unavailable"), { liveFallback: true });
+    expect(info.title).toMatch(/on the map/i);
+    expect(info.fallbackNote).toMatch(/on the map/i);
+    expect(info.fallbackNote).not.toMatch(/below/i);
+    expect(info.detail).not.toMatch(/below/i);
+  });
 });

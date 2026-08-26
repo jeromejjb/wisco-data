@@ -75,6 +75,17 @@ describe("resolveAgentModelFallback", () => {
     expect(isModelCooling("gemini-2.5-flash")).toBe(true);
   });
 
+  it("hops to OpenAI before other Gemini models when both keys exist", () => {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "g";
+    process.env.OPENAI_API_KEY = "o";
+    process.env.AGENT_PROVIDER = "google";
+    process.env.AGENT_MODEL = "gemini-2.5-flash";
+
+    const ids = getAgentModelCandidates().map((c) => c.modelId);
+    expect(ids[0]).toBe("gemini-2.5-flash");
+    expect(ids[1]).toBe("gpt-4o-mini");
+  });
+
   it("lists lite models after the primary", () => {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-key";
     process.env.AGENT_PROVIDER = "google";

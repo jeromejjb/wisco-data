@@ -184,34 +184,32 @@ export function MapChatWidget() {
         )}
 
         <AnimatePresence>
-          {agentError && !localMapAnswer && (
+          {agentError && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t border-amber-100/80 bg-amber-50/90 px-4 py-2.5"
+              className="overflow-hidden border-t border-amber-100/80 bg-amber-50/90 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-950/50"
             >
-              <p className="text-[12px] font-semibold text-amber-950">{agentErrorInfo.title}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-amber-900/75">
+              <p className="text-[12px] font-semibold text-amber-950 dark:text-amber-100">
+                {agentErrorInfo.title}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-amber-900/75 dark:text-amber-100/70">
                 {agentErrorInfo.detail}
               </p>
+              {localMapAnswer && (
+                <p className="mt-1 text-[10px] text-amber-800/70 dark:text-amber-100/50">
+                  {agentErrorInfo.fallbackNote}
+                </p>
+              )}
               {agentErrorInfo.isRateLimited && (
-                <p className="mt-1 text-[10px] text-amber-800/60">
-                  No action needed — your next question runs automatically.
+                <p className="mt-1 text-[10px] text-amber-800/60 dark:text-amber-100/45">
+                  Next question will try a backup chat model when one is configured.
                 </p>
               )}
             </motion.div>
           )}
         </AnimatePresence>
-
-        {agentError && localMapAnswer && (
-          <div className="border-t border-black/[0.05] bg-[#f8f9fb] px-4 py-2">
-            <p className="text-[11px] text-[#5a6278]">
-              <span className="font-semibold text-[#3d4659]">{agentErrorInfo.title}.</span>{" "}
-              {agentErrorInfo.fallbackNote}
-            </p>
-          </div>
-        )}
 
         <form
           onSubmit={handleSubmit}

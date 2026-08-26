@@ -71,7 +71,7 @@ export function agentDailyQuotaCopy(): { title: string; detail: string } {
   return {
     title: "Today's free AI allowance is used up",
     detail:
-      "It refreshes tomorrow — and meanwhile every answer still pulls live Wisconsin data: the map, jobs, and county numbers below keep working just the same.",
+      "It refreshes tomorrow. Chat may hop to another free model when one is available — and the map, jobs, and county numbers on the map keep working either way.",
   };
 }
 
@@ -92,7 +92,7 @@ export function agentRateLimitCopy(errorMessage?: string): {
 
   return {
     title: "AI is taking a quick breath",
-    detail: `Free usage limits recharge on their own — full AI answers are back in ${window}. Nothing else skips a beat: the live map, jobs, and county data below are all still working.`,
+    detail: `Free usage limits recharge on their own — full chat answers are back in ${window}. The live map, jobs, and county data on the map are still working.`,
     retryAfterMinutes,
   };
 }
