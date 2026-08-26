@@ -8,6 +8,10 @@ import {
   Popup,
   NavigationControl,
   ScaleControl,
+  MAP_WEBGL_ATTRIBUTES,
+  mapCanRender,
+  safeMapRemove,
+  safeMapResize,
   type GeoJSONSource,
   type MapLibreMap,
 } from "@/lib/maplibre";
@@ -38,12 +42,16 @@ import {
   WISCONSIN_BOUNDS,
   WISCONSIN_CENTER,
   WISCONSIN_DEFAULT_ZOOM,
-  WISCONSIN_IMMERSIVE_CENTER,
-  WISCONSIN_IMMERSIVE_ZOOM,
-  WISCONSIN_IMMERSIVE_PITCH,
+  fitWisconsinCamera,
   type MapStyleId,
 } from "@/lib/map-styles";
 import { MapBasemapSwitcher } from "./map-basemap-switcher";
+import { MapWebGLUnavailable } from "./map-webgl-unavailable";
+import {
+  isGpuInitializationError,
+  probeWebGL2,
+  type WebGL2Probe,
+} from "@/lib/webgl-support";
 import type { MapMarkerAction } from "@/lib/agent/map-actions";
 import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { topicLabel, toneColor } from "@/lib/news-geo";
@@ -209,6 +217,7 @@ export function AgentMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [countiesReady, setCountiesReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [webglProbe, setWebglProbe] = useState<WebGL2Probe | null>(null);
 
   const {
     center,
@@ -534,52 +543,73 @@ export function AgentMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const support = probeWebGL2();
+    if (!support.ok) {
+      setWebglProbe(support);
+      return;
+    }
+
     const container = containerRef.current;
     const style = getInitialMapStyle(mapStyleId, darkMode, { forceLight: forceLightBasemap });
 
-    const map = new Map({
-      container,
-      style,
-      center: [center.lng ?? WISCONSIN_CENTER.lng, center.lat ?? WISCONSIN_CENTER.lat],
-      zoom: zoom ?? WISCONSIN_DEFAULT_ZOOM,
-      pitch: pitch ?? 0,
-      bearing: bearing ?? 0,
-      maxBounds: WISCONSIN_BOUNDS,
-      minZoom: 5.5,
-      maxZoom: onSatellite ? 18 : 14,
-      attributionControl: { compact: true },
-      fadeDuration: 0,
-      refreshExpiredTiles: false,
-      maxTileCacheSize: 256,
-      dragRotate: false,
-      pitchWithRotate: false,
-    });
+    let map: MapLibreMap;
+    try {
+      map = new Map({
+        container,
+        style,
+        center: [center.lng ?? WISCONSIN_CENTER.lng, center.lat ?? WISCONSIN_CENTER.lat],
+        zoom: zoom ?? WISCONSIN_DEFAULT_ZOOM,
+        pitch: pitch ?? 0,
+        bearing: bearing ?? 0,
+        maxBounds: WISCONSIN_BOUNDS,
+        minZoom: 5,
+        maxZoom: onSatellite ? 18 : 14,
+        attributionControl: { compact: true },
+        fadeDuration: 0,
+        refreshExpiredTiles: false,
+        maxTileCacheSize: 256,
+        dragRotate: false,
+        pitchWithRotate: false,
+        canvasContextAttributes: { ...MAP_WEBGL_ATTRIBUTES },
+      });
+    } catch (err) {
+      if (isGpuInitializationError(err)) {
+        setWebglProbe(support);
+        return;
+      }
+      setMapError("Map failed to load. Hard refresh the page (Cmd+Shift+R).");
+      return;
+    }
+
+    if (!mapCanRender(map)) {
+      setWebglProbe(support);
+      safeMapRemove(map);
+      return;
+    }
 
     const readyFallback = window.setTimeout(() => {
-      map.resize();
-      setMapLoaded(true);
+      safeMapResize(map);
+      if (mapCanRender(map)) setMapLoaded(true);
     }, 2500);
 
     let ready = false;
 
     const markReady = () => {
       if (ready) return;
+      if (!mapCanRender(map)) return;
       ready = true;
       window.clearTimeout(readyFallback);
       setMapLoaded(true);
       setMapError(null);
-      map.resize();
+      safeMapResize(map);
       if (immersive) {
-        map.jumpTo({
-          center: [WISCONSIN_IMMERSIVE_CENTER.lng, WISCONSIN_IMMERSIVE_CENTER.lat],
-          zoom: WISCONSIN_IMMERSIVE_ZOOM,
-          pitch: WISCONSIN_IMMERSIVE_PITCH,
-          bearing: 0,
-        });
+        fitWisconsinCamera(map, 0);
       }
       addCountyLayersRef.current(map).catch(console.error);
       requestAnimationFrame(() => {
-        map.resize();
+        safeMapResize(map);
+        if (immersive) fitWisconsinCamera(map, 0);
+        if (!mapCanRender(map)) return;
         if (!navControlAddedRef.current) {
           navControlAddedRef.current = true;
           map.addControl(
@@ -595,8 +625,21 @@ export function AgentMap({
     };
 
     map.on("load", markReady);
-    map.on("style.load", () => map.resize());
+    map.on("style.load", () => safeMapResize(map));
     map.on("error", (e) => {
+      if (isGpuInitializationError(e.error)) {
+        window.clearTimeout(readyFallback);
+        const status =
+          e.error && typeof e.error === "object" && "statusMessage" in e.error
+            ? String((e.error as { statusMessage?: string | null }).statusMessage ?? "")
+            : "";
+        setWebglProbe({
+          ok: false,
+          statusMessage:
+            status || (e.error instanceof Error ? e.error.message : "WebGL2 is required"),
+        });
+        return;
+      }
       const message =
         e.error instanceof Error
           ? e.error.message
@@ -605,7 +648,13 @@ export function AgentMap({
             : "";
       // Ignore transient tile fetch failures; surface style/parse errors only.
       if (message.includes("Failed to fetch") || message.includes("404")) return;
-      if (message.includes("raster-") || !map.isStyleLoaded()) {
+      let styleLoaded = false;
+      try {
+        styleLoaded = Boolean(map.isStyleLoaded());
+      } catch {
+        styleLoaded = false;
+      }
+      if (message.includes("raster-") || !styleLoaded) {
         console.error("Map error:", message || e);
         setMapError("Map failed to load. Hard refresh the page (Cmd+Shift+R).");
       }
@@ -614,8 +663,8 @@ export function AgentMap({
     mapRef.current = map;
 
     requestAnimationFrame(() => {
-      map.resize();
-      if (map.loaded()) markReady();
+      safeMapResize(map);
+      if (mapCanRender(map) && map.loaded()) markReady();
     });
 
     return () => {
@@ -626,7 +675,7 @@ export function AgentMap({
       hoverPopupRef.current?.remove();
       hoverCountyRef.current = null;
       hoverHandlersBound.current = false;
-      map.remove();
+      safeMapRemove(map);
       mapRef.current = null;
       navControlAddedRef.current = false;
       scaleControlAddedRef.current = false;
@@ -645,14 +694,17 @@ export function AgentMap({
 
     const ro = new ResizeObserver(() => {
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-      resizeTimerRef.current = setTimeout(() => map.resize(), 120);
+      resizeTimerRef.current = setTimeout(() => {
+        safeMapResize(map);
+        if (immersive && flyToNonce === 0) fitWisconsinCamera(map, 0);
+      }, 120);
     });
     ro.observe(container);
     return () => {
       ro.disconnect();
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [mapLoaded]);
+  }, [mapLoaded, immersive, flyToNonce]);
 
   // Style / basemap switch — home (forceLight) ignores theme toggles
   useEffect(() => {
@@ -893,13 +945,14 @@ export function AgentMap({
         className
       )}
     >
-      {!mapLoaded && !mapError && (
+      {!mapLoaded && !mapError && !webglProbe && (
         <div className="pointer-events-none absolute right-14 top-3 z-20 flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-md">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
           <p className="text-[11px] text-white/80">Loading map…</p>
         </div>
       )}
-      {mapError && (
+      {webglProbe && <MapWebGLUnavailable probe={webglProbe} />}
+      {mapError && !webglProbe && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[#eef2f6] px-6 text-center dark:bg-navy-900">
           <p className="text-sm font-medium text-foreground">Map unavailable</p>
           <p className="text-xs text-muted-foreground">{mapError}</p>

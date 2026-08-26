@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Map,
   Marker,
   NavigationControl,
+  MAP_WEBGL_ATTRIBUTES,
+  mapCanRender,
+  safeMapRemove,
   type MapLibreMap,
 } from "@/lib/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -22,6 +25,8 @@ import {
 } from "@/lib/map-styles";
 import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
 import { buildChoroplethExpression, fipsValuesFromCountyIds } from "./map-legend";
+import { MapWebGLUnavailable } from "./map-webgl-unavailable";
+import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
 
 const COUNTIES_SOURCE = "wi-counties";
 const COUNTIES_FILL = "wi-counties-fill";
@@ -43,6 +48,7 @@ export default function RealMap({
   const skipStyleChangeRef = useRef(true);
   const darkMode = useAppStore((s) => s.darkMode);
   const reducedMotion = usePrefersReducedMotion();
+  const [webglProbe, setWebglProbe] = useState<WebGL2Probe | null>(null);
 
   const style = hasMapboxToken()
     ? getMapStyleUrl("streets", darkMode)
@@ -123,15 +129,45 @@ export default function RealMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = new Map({
-      container: containerRef.current,
-      style,
-      center: [center.lng, center.lat],
-      zoom,
-      maxBounds: WISCONSIN_BOUNDS,
-      minZoom: 5,
-      maxZoom: 14,
-      fadeDuration: 0,
+    const support = probeWebGL2();
+    if (!support.ok) {
+      setWebglProbe(support);
+      return;
+    }
+
+    let map: MapLibreMap;
+    try {
+      map = new Map({
+        container: containerRef.current,
+        style,
+        center: [center.lng, center.lat],
+        zoom,
+        maxBounds: WISCONSIN_BOUNDS,
+        minZoom: 5,
+        maxZoom: 14,
+        fadeDuration: 0,
+        canvasContextAttributes: { ...MAP_WEBGL_ATTRIBUTES },
+      });
+    } catch (err) {
+      setWebglProbe(
+        isGpuInitializationError(err) ? support : { ok: false, statusMessage: null }
+      );
+      return;
+    }
+
+    if (!mapCanRender(map)) {
+      setWebglProbe(support);
+      safeMapRemove(map);
+      return;
+    }
+
+    map.on("error", (e) => {
+      if (isGpuInitializationError(e.error)) {
+        setWebglProbe({
+          ok: false,
+          statusMessage: e.error instanceof Error ? e.error.message : null,
+        });
+      }
     });
 
     if (showControls) {
@@ -146,7 +182,7 @@ export default function RealMap({
 
     return () => {
       markersRef.current.forEach((m) => m.remove());
-      map.remove();
+      safeMapRemove(map);
       mapRef.current = null;
       skipStyleChangeRef.current = true;
     };
@@ -192,9 +228,12 @@ export default function RealMap({
   }, [center.lat, center.lng, zoom, reducedMotion]);
 
   return (
-    <div
-      ref={containerRef}
-      className={cn("h-full min-h-[300px] w-full overflow-hidden rounded-2xl bg-navy-900", className)}
-    />
+    <div className={cn("relative h-full min-h-[300px] w-full", className)}>
+      {webglProbe ? <MapWebGLUnavailable probe={webglProbe} /> : null}
+      <div
+        ref={containerRef}
+        className="h-full min-h-[300px] w-full overflow-hidden rounded-2xl bg-navy-900"
+      />
+    </div>
   );
 }

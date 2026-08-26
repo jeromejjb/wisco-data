@@ -7,6 +7,7 @@ import {
   GeolocateControl,
 } from "maplibre-gl";
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import { MAP_WEBGL_ATTRIBUTES } from "@/lib/webgl-support";
 
 export {
   Map,
@@ -17,4 +18,28 @@ export {
   GeolocateControl,
   type GeoJSONSource,
   type MapLibreMap,
+  MAP_WEBGL_ATTRIBUTES,
 };
+
+/** MapLibre 6 leaves `painter` unset when WebGL2 init fails; resize/remove then throw. */
+export function mapCanRender(map: MapLibreMap | null | undefined): map is MapLibreMap {
+  return Boolean(map && (map as { painter?: unknown }).painter);
+}
+
+export function safeMapResize(map: MapLibreMap | null | undefined) {
+  if (!mapCanRender(map)) return;
+  try {
+    map.resize();
+  } catch {
+    /* WebGL context never came up */
+  }
+}
+
+export function safeMapRemove(map: MapLibreMap | null | undefined) {
+  if (!map) return;
+  try {
+    map.remove();
+  } catch {
+    /* destroy() crashes when painter was never created */
+  }
+}
