@@ -1,0 +1,54 @@
+/**
+ * Helpers for GitHub Flow: one issue → one branch → one PR into main.
+ */
+
+export function slugify(title, max = 72) {
+  const slug = String(title ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, max)
+    .replace(/-+$/g, "");
+  return slug || "feature";
+}
+
+export function branchName(number, title) {
+  return `issue/${number}-${slugify(title)}`;
+}
+
+function labelNames(labels) {
+  if (!Array.isArray(labels)) return [];
+  return labels.map((label) => (typeof label === "string" ? label : label?.name)).filter(Boolean);
+}
+
+/**
+ * @param {{ pull_request?: unknown, state?: string, labels?: unknown }} issue
+ * @returns {{ ok: true } | { ok: false, reason: string }}
+ */
+export function shouldStartFeature(issue) {
+  const labels = labelNames(issue?.labels);
+  if (issue?.pull_request) return { ok: false, reason: "issue is a pull request" };
+  if (issue?.state && issue.state !== "open") return { ok: false, reason: "issue is not open" };
+  if (labels.includes("automated") || labels.includes("no-branch")) {
+    return { ok: false, reason: "skipped by label" };
+  }
+  if (!labels.includes("feature") && !labels.includes("enhancement")) {
+    return { ok: false, reason: "needs feature or enhancement label" };
+  }
+  return { ok: true };
+}
+
+export function prBody(issueNumber, issueBody) {
+  const summary = String(issueBody ?? "").trim() || "_See the linked issue._";
+  return [
+    `Closes #${issueNumber}`,
+    "",
+    summary,
+    "",
+    "## Test plan",
+    "- [ ] `npm test` and `npm run lint`",
+    "- [ ] Exercise the changed flow in the browser",
+    "",
+    "_Branch and PR opened against `main`. CI runs after the first push of work._",
+  ].join("\n");
+}

@@ -1,0 +1,52 @@
+import { describe, expect, it } from "vitest";
+import { branchName, prBody, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
+
+describe("slugify", () => {
+  it("builds a short git-safe slug", () => {
+    expect(slugify("News feeds follow the searched market!")).toBe(
+      "news-feeds-follow-the-searched-market"
+    );
+  });
+
+  it("falls back when the title has no useful characters", () => {
+    expect(slugify("???")).toBe("feature");
+  });
+});
+
+describe("branchName", () => {
+  it("prefixes the issue number", () => {
+    expect(branchName(12, "Rate-limit copy")).toBe("issue/12-rate-limit-copy");
+  });
+});
+
+describe("shouldStartFeature", () => {
+  it("accepts open feature issues", () => {
+    expect(
+      shouldStartFeature({ state: "open", labels: [{ name: "feature" }] })
+    ).toEqual({ ok: true });
+  });
+
+  it("skips automated digest issues", () => {
+    expect(
+      shouldStartFeature({
+        state: "open",
+        labels: ["feature", "automated"],
+      })
+    ).toMatchObject({ ok: false });
+  });
+
+  it("requires a feature or enhancement label", () => {
+    expect(shouldStartFeature({ state: "open", labels: ["bug"] })).toMatchObject({
+      ok: false,
+    });
+  });
+});
+
+describe("prBody", () => {
+  it("targets main via Closes and includes a test plan", () => {
+    const body = prBody(4, "Unify the county panel.");
+    expect(body).toContain("Closes #4");
+    expect(body).toContain("Unify the county panel.");
+    expect(body).toContain("## Test plan");
+  });
+});

@@ -9,8 +9,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 1. Add a `## [X.Y.Z] - YYYY-MM-DD` section at the top of this file.
 2. Set `"version"` in `package.json` to `X.Y.Z` (or run `npm version <patch|minor|major> --no-git-tag-version`).
-3. Commit, then tag and push: `git tag vX.Y.Z && git push origin main --follow-tags`.
+3. Open a PR into `main`. After merge, tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. GitHub Actions publishes a GitHub Release from the tag.
+
+## [Unreleased]
+
+### Changed
+
+- Feature work starts as a GitHub issue, then a dedicated `issue/{n}-…` branch and pull request into `main`.
+- CI (lint, test, build) must pass before production Vercel deploy. Deploy runs only after a merge (or push) to `main`, not on pull requests.
+- Removed the old “open issues from commits already on main” catalog workflow.
 
 ## [0.2.0] - 2026-08-25
 
