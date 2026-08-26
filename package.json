@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "issues:sync": "node scripts/sync-feature-issues.mjs",
+    "feature:start": "node scripts/start-feature.mjs",
     "version:check": "node scripts/check-version.mjs",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",

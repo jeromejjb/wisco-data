@@ -1,0 +1,48 @@
+name: Feature branch and PR
+
+# GitHub Flow: a feature issue gets its own branch and a PR into main.
+# Production deploy is not part of this workflow — that happens after CI on main.
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to create a branch and PR for
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  start:
+    name: Open branch and PR into main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request == null &&
+        (
+          github.event.action != 'labeled' ||
+          github.event.label.name == 'feature' ||
+          github.event.label.name == 'enhancement'
+        )
+      )
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Create branch and pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ISSUE="${{ github.event.inputs.issue || github.event.issue.number }}"
+          node scripts/start-feature.mjs --issue "$ISSUE"
