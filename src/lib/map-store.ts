@@ -7,6 +7,7 @@ import type {
   MapAction,
   MapMarkerAction,
 } from "@/lib/agent/map-actions";
+import type { AreaSentimentSnapshot, LocalNewsMapPin } from "@/lib/news-types";
 import { WISCONSIN_CENTER, WISCONSIN_DEFAULT_ZOOM } from "@/lib/map-styles";
 
 export type SelectedCounty = {
