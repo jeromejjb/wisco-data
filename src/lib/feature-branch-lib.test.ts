@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchName, prBody, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
+import { branchName, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
 
 describe("slugify", () => {
   it("builds a short git-safe slug", () => {
@@ -48,5 +48,38 @@ describe("prBody", () => {
     expect(body).toContain("Closes #4");
     expect(body).toContain("Unify the county panel.");
     expect(body).toContain("## Test plan");
+  });
+
+  it("uses Related when the issue is already closed", () => {
+    expect(prBody(4, "Follow-up.", { issueOpen: false })).toContain("Related to #4");
+  });
+});
+
+describe("issueNumberFromBranch", () => {
+  it("reads the issue number from GitHub Flow branch names", () => {
+    expect(issueNumberFromBranch("issue/12-rate-limit-copy")).toBe(12);
+    expect(issueNumberFromBranch("issue/38")).toBe(38);
+    expect(issueNumberFromBranch("main")).toBeNull();
+  });
+});
+
+describe("prTitleFromSubjects", () => {
+  it("skips the empty Start commit", () => {
+    expect(
+      prTitleFromSubjects(
+        ["Make the job sheet scroll", "Start #14: audit high fixes"],
+        "issue/14-audit"
+      )
+    ).toBe("Make the job sheet scroll");
+  });
+});
+
+describe("prAlreadyExistsUrl", () => {
+  it("reads the existing PR URL from gh stderr", () => {
+    const stderr =
+      'a pull request for branch "issue/auto-open-prs" into branch "main" already exists:\nhttps://github.com/jeromejjb/wisco-data/pull/40\n';
+    expect(prAlreadyExistsUrl(stderr)).toBe(
+      "https://github.com/jeromejjb/wisco-data/pull/40"
+    );
   });
 });

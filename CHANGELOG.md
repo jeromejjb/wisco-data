@@ -14,9 +14,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Pushing to an `issue/{n}-…` branch with no open PR now opens one into `main` automatically.
+
 ### Changed
 
-- Feature work starts as a GitHub issue, then a dedicated `issue/{n}-…` branch and pull request into `main`.
+- Feature work starts as a GitHub issue, then a dedicated `issue/{n}-…` branch and pull request into `main`. Pushing more work to that branch without an open PR opens one automatically.
 - CI (lint, test, build) must pass before production Vercel deploy. Deploy runs only after a merge (or push) to `main`, not on pull requests.
 - Removed the old “open issues from commits already on main” catalog workflow.
 
