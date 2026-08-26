@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchName, issueNumberFromBranch, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
+import { branchName, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
 
 describe("slugify", () => {
   it("builds a short git-safe slug", () => {
@@ -71,5 +71,15 @@ describe("prTitleFromSubjects", () => {
         "issue/14-audit"
       )
     ).toBe("Make the job sheet scroll");
+  });
+});
+
+describe("prAlreadyExistsUrl", () => {
+  it("reads the existing PR URL from gh stderr", () => {
+    const stderr =
+      'a pull request for branch "issue/auto-open-prs" into branch "main" already exists:\nhttps://github.com/jeromejjb/wisco-data/pull/40\n';
+    expect(prAlreadyExistsUrl(stderr)).toBe(
+      "https://github.com/jeromejjb/wisco-data/pull/40"
+    );
   });
 });

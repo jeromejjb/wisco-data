@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   issueNumberFromBranch,
+  prAlreadyExistsUrl,
   prBody,
   prTitleFromSubjects,
 } from "./feature-branch-lib.mjs";
@@ -44,21 +45,17 @@ function currentBranch() {
   return git(["branch", "--show-current"]);
 }
 
-function headFilter(branch) {
-  const repo = process.env.GITHUB_REPOSITORY || process.env.GH_REPO || "";
-  const owner = repo.split("/")[0];
-  return owner ? `${owner}:${branch}` : branch;
-}
-
-function existingOpenPr(head) {
+function existingOpenPr(branch) {
   try {
+    // `gh pr list --head owner:branch` returns [] for same-repo heads.
+    // Pass the branch name only.
     const raw = gh([
       "pr",
       "list",
       "--state",
       "open",
       "--head",
-      headFilter(head),
+      branch,
       "--base",
       "main",
       "--json",
@@ -150,6 +147,11 @@ function main() {
     const prUrl = gh(prArgs);
     console.log(`Opened ${prUrl}`);
   } catch (err) {
+    const existingUrl = prAlreadyExistsUrl(err.stderr || err.message);
+    if (existingUrl) {
+      console.log(`PR already open: ${existingUrl}`);
+      return;
+    }
     const raced = existingOpenPr(branch);
     if (raced) {
       console.log(`PR already open: ${raced.url}`);

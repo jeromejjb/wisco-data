@@ -72,3 +72,11 @@ export function prTitleFromSubjects(subjects, branch) {
   if (issue) return `Continue #${issue}`;
   return branch || "Update";
 }
+
+/** Parse `gh pr create` when a PR for this head already exists. */
+export function prAlreadyExistsUrl(stderr) {
+  const match = String(stderr ?? "").match(
+    /already exists:\s*(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/i
+  );
+  return match ? match[1] : null;
+}

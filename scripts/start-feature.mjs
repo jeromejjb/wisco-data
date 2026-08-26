@@ -75,13 +75,7 @@ function createIssue({ title, body, labels }) {
   return { number: Number(match[1]), url };
 }
 
-function headFilter(branch) {
-  const repo = process.env.GITHUB_REPOSITORY || process.env.GH_REPO || "";
-  const owner = repo.split("/")[0];
-  return owner ? `${owner}:${branch}` : branch;
-}
-
-function existingPr(head) {
+function existingPr(branch) {
   try {
     const raw = gh([
       "pr",
@@ -89,7 +83,7 @@ function existingPr(head) {
       "--state",
       "open",
       "--head",
-      headFilter(head),
+      branch,
       "--base",
       "main",
       "--json",
