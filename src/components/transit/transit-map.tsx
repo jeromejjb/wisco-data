@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { mapFlyDurationMs } from "@/lib/motion";
-import { MapWebGLUnavailable } from "@/components/map/map-webgl-unavailable";
+import { RasterFallbackMap } from "@/components/map/raster-fallback-map";
 import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
 import {
   getRasterBasemapStyle,
@@ -333,14 +333,23 @@ export function TransitMap({
 
   return (
     <div className="relative h-full min-h-[280px] w-full">
-      {webglProbe ? <MapWebGLUnavailable probe={webglProbe} /> : null}
-      <div
-        ref={containerRef}
-        className={cn(
-          "h-full min-h-[280px] w-full overflow-hidden rounded-2xl bg-navy-900 sm:min-h-[360px] lg:min-h-[420px]",
-          className
-        )}
-      />
+      {webglProbe ? (
+        <RasterFallbackMap
+          darkMode={darkMode}
+          className={cn(
+            "relative min-h-[280px] overflow-hidden rounded-2xl sm:min-h-[360px] lg:min-h-[420px]",
+            className
+          )}
+        />
+      ) : (
+        <div
+          ref={containerRef}
+          className={cn(
+            "h-full min-h-[280px] w-full overflow-hidden rounded-2xl bg-navy-900 sm:min-h-[360px] lg:min-h-[420px]",
+            className
+          )}
+        />
+      )}
     </div>
   );
 }
