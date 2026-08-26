@@ -12,6 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "feature:start": "node scripts/start-feature.mjs",
     "pr:ensure": "node scripts/ensure-pr.mjs",
+    "night-shift:scan": "node scripts/night-shift-scan.mjs",
+    "night-shift:implement": "node scripts/night-shift-implement.mjs",
     "version:check": "node scripts/check-version.mjs",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",

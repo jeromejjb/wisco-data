@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchName, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
+import { branchName, isActionsCreatePrDenied, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
 
 describe("slugify", () => {
   it("builds a short git-safe slug", () => {
@@ -31,6 +31,15 @@ describe("shouldStartFeature", () => {
       shouldStartFeature({
         state: "open",
         labels: ["feature", "automated"],
+      })
+    ).toMatchObject({ ok: false });
+  });
+
+  it("skips night-shift issues so the implement agent owns the PR", () => {
+    expect(
+      shouldStartFeature({
+        state: "open",
+        labels: ["enhancement", "night-shift"],
       })
     ).toMatchObject({ ok: false });
   });
@@ -81,5 +90,16 @@ describe("prAlreadyExistsUrl", () => {
     expect(prAlreadyExistsUrl(stderr)).toBe(
       "https://github.com/jeromejjb/wisco-data/pull/40"
     );
+  });
+});
+
+describe("isActionsCreatePrDenied", () => {
+  it("detects the default GITHUB_TOKEN restriction", () => {
+    expect(
+      isActionsCreatePrDenied(
+        "pull request create failed: GraphQL: GitHub Actions is not permitted to create or approve pull requests (createPullRequest)\n"
+      )
+    ).toBe(true);
+    expect(isActionsCreatePrDenied("already exists")).toBe(false);
   });
 });

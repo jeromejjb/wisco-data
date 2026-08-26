@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  isActionsCreatePrDenied,
   issueNumberFromBranch,
   prAlreadyExistsUrl,
   prBody,
@@ -147,7 +148,8 @@ function main() {
     const prUrl = gh(prArgs);
     console.log(`Opened ${prUrl}`);
   } catch (err) {
-    const existingUrl = prAlreadyExistsUrl(err.stderr || err.message);
+    const stderr = err.stderr || err.message;
+    const existingUrl = prAlreadyExistsUrl(stderr);
     if (existingUrl) {
       console.log(`PR already open: ${existingUrl}`);
       return;
@@ -156,6 +158,12 @@ function main() {
     if (raced) {
       console.log(`PR already open: ${raced.url}`);
       return;
+    }
+    if (isActionsCreatePrDenied(stderr)) {
+      console.error(
+        "GitHub Actions cannot create pull requests with the default GITHUB_TOKEN. Enable Settings → Actions → General → Workflow permissions → “Allow GitHub Actions to create and approve pull requests”, or set repo secret PR_GITHUB_TOKEN to a PAT with repo scope."
+      );
+      process.exit(1);
     }
     throw err;
   }

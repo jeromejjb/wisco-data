@@ -35,7 +35,7 @@ export function shouldStartFeature(issue) {
   const labels = labelNames(issue?.labels);
   if (issue?.pull_request) return { ok: false, reason: "issue is a pull request" };
   if (issue?.state && issue.state !== "open") return { ok: false, reason: "issue is not open" };
-  if (labels.includes("automated") || labels.includes("no-branch")) {
+  if (labels.includes("automated") || labels.includes("no-branch") || labels.includes("night-shift")) {
     return { ok: false, reason: "skipped by label" };
   }
   if (!labels.includes("feature") && !labels.includes("enhancement")) {
@@ -79,4 +79,11 @@ export function prAlreadyExistsUrl(stderr) {
     /already exists:\s*(https:\/\/github\.com\/[^\s]+\/pull\/\d+)/i
   );
   return match ? match[1] : null;
+}
+
+/** Default GITHUB_TOKEN cannot open PRs unless the repo allows it. */
+export function isActionsCreatePrDenied(stderr) {
+  return /GitHub Actions is not permitted to create or approve pull requests/i.test(
+    String(stderr ?? "")
+  );
 }

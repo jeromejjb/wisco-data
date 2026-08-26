@@ -41,7 +41,7 @@ jobs:
           node-version: 20
       - name: Create branch and pull request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PR_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           ISSUE="${{ github.event.inputs.issue || github.event.issue.number }}"

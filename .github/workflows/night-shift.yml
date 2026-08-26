@@ -1,0 +1,58 @@
+name: Night shift
+
+# 24/7 improvement loop: scan the catalog, file one issue, then (when
+# CURSOR_API_KEY is set) launch a Cursor cloud agent to open a PR for approval.
+# Nothing here merges to main.
+
+on:
+  schedule:
+    - cron: "0 */8 * * *"
+  workflow_dispatch:
+    inputs:
+      skip_implement:
+        description: "Only file the next catalog issue (do not launch a Cursor agent)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: night-shift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  scan:
+    name: File the next improvement issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Scan and file
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/night-shift-scan.mjs
+
+  implement:
+    name: Open an implementing PR for approval
+    needs: scan
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_implement != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Implement one night-shift issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: node scripts/night-shift-implement.mjs
