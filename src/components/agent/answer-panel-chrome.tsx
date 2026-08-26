@@ -41,9 +41,7 @@ export function AnswerCard({
         "relative overflow-hidden rounded-[24px] bg-[#0e1626f5]",
         "ring-1 ring-inset ring-white/10",
         "shadow-[0_2px_6px_rgba(4,8,18,0.25),0_18px_44px_-8px_rgba(4,8,18,0.48),0_44px_90px_-18px_rgba(4,8,18,0.42)]",
-        "backdrop-blur-2xl saturate-[1.15]",
         "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-b before:from-white/5 before:to-transparent",
-        "after:pointer-events-none after:absolute after:-right-12 after:-top-12 after:h-36 after:w-36 after:rounded-full after:bg-cyan-400/10 after:blur-3xl",
         className
       )}
     >
@@ -54,7 +52,7 @@ export function AnswerCard({
 
 export function MapLegendHint({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-relaxed text-white/45">
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-relaxed text-white/60">
       {children}
     </p>
   );

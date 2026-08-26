@@ -21,7 +21,7 @@ const variantStyles: Record<
   dark: {
     wrap: "",
     text: "text-sm text-white/80",
-    sub: "text-[10px] text-white/40",
+    sub: "text-[10px] text-white/60",
     pulse: "border-cyan-400/60 bg-cyan-400/20",
   },
   light: {
@@ -31,15 +31,15 @@ const variantStyles: Record<
     pulse: "border-[#1e6b9c]/50 bg-[#1e6b9c]/10",
   },
   pill: {
-    wrap: "rounded-full border border-white/30 bg-white/92 px-4 py-2.5 shadow-md backdrop-blur-md",
-    text: "text-xs font-medium text-[#3d4659]",
-    sub: "text-[10px] text-[#8b95a8]",
+    wrap: "rounded-full border border-white/30 bg-white/92 px-4 py-2.5 shadow-md backdrop-blur-md dark:border-white/12 dark:bg-[#0f1524]/92",
+    text: "text-xs font-medium text-[#3d4659] dark:text-[#eef2f7]",
+    sub: "text-[10px] text-[#8b95a8] dark:text-[#b4bcc9]",
     pulse: "border-[#1e6b9c]/50 bg-[#1e6b9c]/10",
   },
   inline: {
-    wrap: "rounded-xl border border-black/[0.06] bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm",
-    text: "text-[12px] font-medium text-[#3d4659]",
-    sub: "text-[10px] text-[#8b95a8]",
+    wrap: "rounded-xl border border-black/[0.06] bg-white/95 px-3 py-2 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-[#0f1524]/95",
+    text: "text-[12px] font-medium text-[#3d4659] dark:text-[#eef2f7]",
+    sub: "text-[10px] text-[#8b95a8] dark:text-[#b4bcc9]",
     pulse: "border-[#1e6b9c]/50 bg-[#1e6b9c]/10",
   },
 };

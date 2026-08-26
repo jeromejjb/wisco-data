@@ -11,6 +11,8 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { mapFlyDurationMs } from "@/lib/motion";
 import {
   getRasterBasemapStyle,
   getMapStyleUrl,
@@ -99,6 +101,7 @@ export function TransitMap({
   const vehicleMarkersRef = useRef<Marker[]>([]);
   const skipStyleChangeRef = useRef(true);
   const darkMode = useAppStore((s) => s.darkMode);
+  const reducedMotion = usePrefersReducedMotion();
 
   const style = hasMapboxToken()
     ? getMapStyleUrl("streets", darkMode)
@@ -284,8 +287,13 @@ export function TransitMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.flyTo({ center: [center.lng, center.lat], zoom, duration: 700 });
-  }, [center.lat, center.lng, zoom]);
+    map.flyTo({
+      center: [center.lng, center.lat],
+      zoom,
+      duration: mapFlyDurationMs(reducedMotion, false),
+      essential: false,
+    });
+  }, [center.lat, center.lng, zoom, reducedMotion]);
 
   return (
     <div className="relative h-full min-h-[280px] w-full">

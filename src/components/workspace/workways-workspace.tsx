@@ -11,6 +11,7 @@ import { DataGatheringLoader } from "@/components/ui/data-gathering-loader";
 import { messagesForContext } from "@/lib/loading-messages";
 import { useUserArea } from "@/hooks/use-user-area";
 import { MapLocalNewsBridgeFromSession } from "@/components/agent/map-local-news-bridge";
+import { MapA11yAnnouncer } from "@/components/a11y/map-a11y-announcer";
 import { MapCountyPanel } from "@/components/agent/map-county-panel";
 import { MapAreaSentiment } from "@/components/agent/map-area-sentiment";
 import { useMapStore } from "@/lib/map-store";
@@ -85,8 +86,13 @@ function WorkspaceInner() {
   }, [seed, applyActions, setMapDemographics]);
 
   return (
-    <div className="fixed inset-0 z-0 h-dvh w-full overflow-hidden bg-[#e8eef4] dark:bg-[#070b14]">
+    <div
+      className="fixed inset-0 z-0 h-dvh w-full overflow-hidden bg-[#e8eef4] dark:bg-[#070b14]"
+      role="region"
+      aria-label="Wisconsin Workways map"
+    >
       <AgentMap className="absolute inset-0 h-full w-full" immersive defaultStyleId="streets" />
+      <MapA11yAnnouncer />
       <WorkspaceLogo />
       <MapCountyPanel />
       <MapAnswerStack />

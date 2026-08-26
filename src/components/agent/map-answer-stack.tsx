@@ -1,24 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type PanInfo } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { overlaySpring } from "@/lib/motion";
 import { DataGatheringLoader } from "@/components/ui/data-gathering-loader";
 import { useMapSession } from "./map-session-provider";
-import { MapJobResultsPanel } from "./map-job-results-panel";
+import { CompactJobList, JobSheetSummary } from "./map-job-results-panel";
 import { MapGranularInsight } from "./map-granular-insight";
 import { MapBizJournalPanel } from "./map-biz-journal-panel";
 import { MapTransitPanel } from "./map-transit-panel";
 import { MapInsightPanel } from "./map-insight-panel";
 import { inferMapQueryIntent } from "@/lib/agent/map-query-intent";
-import { AnswerCard, LegendDot, MapLegendHint } from "./answer-panel-chrome";
+import { AnswerCard, MapLegendHint } from "./answer-panel-chrome";
 import { useMapStore } from "@/lib/map-store";
+import type { MapJobHit } from "@/lib/agent/local-map-answer";
 
-/** Floating answer cards on the map margin.
- *  Mobile: a capped, collapsible top sheet so answers never bury the map;
- *  tapping a county hands the screen to the county sheet instead.
- *  Desktop: unchanged floating column with hover pass-through to the map. */
+/** One HUD surface on the map — a pill when collapsed, a sheet when jobs exist.
+ *  Job results sit above the ask dock on phones (Maps-style) so all roles can scroll. */
 export function MapAnswerStack() {
   const {
     showAnswerStack,
@@ -30,21 +30,33 @@ export function MapAnswerStack() {
     localMapAnswer,
   } = useMapSession();
   const selectedCounty = useMapStore((s) => s.selectedCounty);
+  const markers = useMapStore((s) => s.markers);
+  const focusMarker = useMapStore((s) => s.focusMarker);
+  const sheetDraggedRef = useRef(false);
   const [expanded, setExpanded] = useState(true);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const stackRef = useRef<HTMLDivElement>(null);
   const lastQuestionRef = useRef(question);
 
-  // A new question always re-opens the summary and presents from the top —
-  // the unemployment gauge / headline must never start scrolled out of view.
+  const jobs = localMapAnswer?.jobs ?? [];
+  const hasJobResults = jobs.length > 0;
+
   useEffect(() => {
     if (question !== lastQuestionRef.current) {
       lastQuestionRef.current = question;
-      setExpanded(true);
+      const narrow = window.matchMedia("(max-width: 1023px)").matches;
+      setExpanded(!narrow);
+      setSelectedJobId(null);
       if (stackRef.current) stackRef.current.scrollTo({ top: 0 });
     }
   }, [question]);
 
-  const hasJobResults = Boolean(localMapAnswer?.jobs.length);
+  useEffect(() => {
+    if (!selectedCounty || hasJobResults) return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setExpanded(false);
+    }
+  }, [selectedCounty, selectedCounty?.fips, hasJobResults]);
   const transitIntent = inferMapQueryIntent(question);
   const showTransitPanel = Boolean(
     transitIntent?.transitMetro ||
@@ -52,61 +64,130 @@ export function MapAnswerStack() {
       (transitIntent?.searchJobs?.transitOnly && transitIntent.searchJobs)
   );
 
+  const sheet = hasJobResults || expanded;
+
+  function focusJob(job: MapJobHit) {
+    setSelectedJobId(job.id);
+    const coords =
+      job.coordinates ?? markers.find((m) => m.id === job.id)?.coordinates;
+    focusMarker(job.id, coords);
+  }
+
+  function toggleExpanded() {
+    setExpanded((v) => !v);
+  }
+
   return (
     <AnimatePresence>
       {showAnswerStack && (
         <motion.div
           ref={stackRef}
           key="answer-stack"
-          initial={{ opacity: 0, y: 14, scale: 0.985 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 10, scale: 0.99 }}
-          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          initial={{ opacity: 0, y: hasJobResults ? 16 : 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={overlaySpring}
+          role="region"
+          aria-label={hasJobResults ? "Job roles near you" : "Prompt answer"}
           className={cn(
-            "float-scroll pointer-events-none fixed z-30 flex flex-col gap-2 overflow-y-auto overscroll-contain",
-            // Mobile: full-width sheet under the logo, capped so the map stays usable
-            "inset-x-3 top-[4.25rem] max-h-[min(56dvh,calc(100dvh-13.5rem))]",
-            // sm+: floating column on the right margin
-            "sm:left-auto sm:right-4 sm:top-[4.5rem] sm:w-[min(380px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-11rem)] lg:top-20",
-            // County detail and answer stack take turns below lg — at 640–1023px
-            // they can't fit side by side (340 + 380 + margins > viewport).
-            selectedCounty && "max-lg:hidden"
+            "pointer-events-none fixed z-30 flex flex-col",
+            hasJobResults
+              ? cn(
+                  "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)] motion-safe:transition-[height] motion-safe:duration-300 motion-safe:ease-out",
+                  expanded
+                    ? "h-[min(64dvh,calc(100dvh-var(--dock-total,10rem)-1.25rem))]"
+                    : "h-[min(42dvh,380px)]",
+                  "lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-[5.5rem] lg:w-[min(380px,calc(100vw-2rem))]",
+                  expanded
+                    ? "lg:h-[min(70dvh,calc(100dvh-10rem))]"
+                    : "lg:h-[min(48dvh,440px)]"
+                )
+              : cn(
+                  "float-scroll overflow-y-auto overscroll-contain",
+                  "inset-x-3 top-[5.75rem]",
+                  selectedCounty
+                    ? "max-h-[min(28dvh,calc(100dvh-var(--dock-total,10rem)-12rem))]"
+                    : "max-h-[min(52dvh,calc(100dvh-12rem))]",
+                  "lg:inset-x-auto lg:left-auto lg:right-4 lg:top-[5.5rem] lg:w-[min(360px,calc(100vw-2rem))] lg:max-h-[calc(100dvh-10rem)]"
+                )
           )}
         >
-          <AnswerCard>
-            {/* Collapse toggle — doubles as the section header */}
+          <div
+            className={cn(
+              "pointer-events-auto flex min-h-0 flex-col overflow-hidden bg-[#0c1222]/95 shadow-[0_12px_40px_rgba(4,8,18,0.35)]",
+              hasJobResults && "h-full",
+              sheet ? "rounded-[22px]" : "rounded-full"
+            )}
+          >
+            {hasJobResults && (
+              <motion.button
+                type="button"
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={0.18}
+                onDragStart={() => {
+                  sheetDraggedRef.current = true;
+                }}
+                onDragEnd={(_e, info: PanInfo) => {
+                  if (info.offset.y < -28 || info.velocity.y < -350) {
+                    setExpanded(true);
+                  } else if (info.offset.y > 28 || info.velocity.y > 350) {
+                    setExpanded(false);
+                  }
+                  window.setTimeout(() => {
+                    sheetDraggedRef.current = false;
+                  }, 0);
+                }}
+                onClick={() => {
+                  if (sheetDraggedRef.current) return;
+                  toggleExpanded();
+                }}
+                tabIndex={-1}
+                aria-hidden
+                className="flex min-h-11 w-full shrink-0 cursor-grab touch-none items-center justify-center pt-1 active:cursor-grabbing lg:hidden"
+              >
+                <span className="h-1.5 w-11 rounded-full bg-white/40" />
+              </motion.button>
+            )}
+
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
+              onClick={toggleExpanded}
               aria-expanded={expanded}
               aria-label={expanded ? "Collapse answer" : "Expand answer"}
-              className="pointer-events-auto relative z-10 flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left"
+              className={cn(
+                "flex w-full shrink-0 items-center justify-between gap-3 text-left",
+                sheet ? "px-4 py-3" : "px-4 py-2.5"
+              )}
             >
-              <span className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className="accent-bar-glow h-4 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-cyan-300 to-[#1e6b9c]"
-                  aria-hidden
-                />
-                <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-white/90">
-                  Summary
-                </span>
+              <span className="min-w-0 truncate font-display text-[13px] font-semibold leading-snug text-white sm:text-[14px]">
+                {displayAnswer || "Live Wisconsin data"}
+                {isStreamingAssistant && (
+                  <span className="ml-1 inline-block h-3 w-0.5 animate-pulse bg-cyan-400 align-middle" />
+                )}
               </span>
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 shrink-0 text-white/50 transition-transform duration-200",
-                  !expanded && "-rotate-90"
+                  "h-4 w-4 shrink-0 text-white/70 transition-transform duration-200",
+                  !expanded && "rotate-180"
                 )}
                 aria-hidden
               />
             </button>
 
-            {expanded ? (
-              <div className="pointer-events-auto space-y-2.5 px-4 py-3.5 sm:pointer-events-none">
-                {question && !localMapAnswer?.countyFocus && (
-                  <p className="border-l-2 border-white/15 pl-3 text-[12px] leading-snug text-white/50">
-                    {question}
-                  </p>
-                )}
+            {hasJobResults && (
+              <div className="flex min-h-0 flex-1 flex-col border-t border-white/8">
+                {localMapAnswer ? <JobSheetSummary result={localMapAnswer} /> : null}
+                <CompactJobList
+                  jobs={jobs}
+                  selectedJobId={selectedJobId}
+                  onFocusJob={focusJob}
+                />
+              </div>
+            )}
+
+            {expanded && !hasJobResults && (
+              <div className="space-y-2.5 border-t border-white/8 px-4 py-3">
                 {isLoading && !displayAnswer ? (
                   <DataGatheringLoader
                     messages={gatheringMessages}
@@ -115,69 +196,53 @@ export function MapAnswerStack() {
                   />
                 ) : (
                   <>
-                    <p className="font-display text-[16px] font-semibold leading-[1.3] tracking-[-0.01em] text-white lg:text-[17px]">
-                      {displayAnswer}
-                      {isStreamingAssistant && (
-                        <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-cyan-400 align-middle" />
-                      )}
-                    </p>
-                    {localMapAnswer?.subline && !localMapAnswer.countyFocus && (
-                      <p className="text-[12px] leading-relaxed text-white/55">{localMapAnswer.subline}</p>
+                    {question && !localMapAnswer?.countyFocus && (
+                      <p className="text-[12px] leading-snug text-white/45">{question}</p>
                     )}
+                    {localMapAnswer?.subline && !localMapAnswer.countyFocus && (
+                      <p className="text-[12px] leading-relaxed text-white/60">{localMapAnswer.subline}</p>
+                    )}
+                    <MapLegendHint>
+                      {localMapAnswer?.bizStories?.length ? (
+                        <span>Journal pins on the map · tap for a story</span>
+                      ) : localMapAnswer?.countyFocus ? (
+                        <span>
+                          Colored by {localMapAnswer.countyFocus.metric.replace("-", " ")} · tap
+                          counties
+                        </span>
+                      ) : (
+                        <span>Tap a county for labor-market detail</span>
+                      )}
+                    </MapLegendHint>
                   </>
                 )}
-                <MapLegendHint>
-                  {hasJobResults ? (
-                    <>
-                      <LegendDot color="#267a55" label="≤30 min" />
-                      <LegendDot color="#1e6b9c" label="≤45 min" />
-                      <span className="text-white/30">·</span>
-                      <span>Tap pins for details</span>
-                    </>
-                  ) : localMapAnswer?.bizStories?.length ? (
-                    <span>Business journal pins on map · tap for story</span>
-                  ) : localMapAnswer?.countyFocus ? (
-                    <span>Colored by {localMapAnswer.countyFocus.metric.replace("-", " ")} · tap counties</span>
-                  ) : (
-                    <span>Tap any county to explore</span>
-                  )}
-                </MapLegendHint>
               </div>
-            ) : (
-              displayAnswer && (
-                <p className="line-clamp-2 px-4 py-2.5 text-[13px] font-medium leading-snug text-white/80">
-                  {isStreamingAssistant && (
-                    <span className="mr-1.5 inline-block h-3 w-0.5 animate-pulse bg-cyan-400 align-middle" />
-                  )}
-                  {displayAnswer}
-                </p>
-              )
             )}
-          </AnswerCard>
+          </div>
 
-          {expanded && localMapAnswer && localMapAnswer.jobs.length > 0 && (
-            <MapJobResultsPanel result={localMapAnswer} />
+          {expanded && !hasJobResults && localMapAnswer?.bizStories && localMapAnswer.bizStories.length > 0 && (
+            <div className={cn("mt-2", selectedCounty && "max-lg:hidden")}>
+              <MapBizJournalPanel
+                stories={localMapAnswer.bizStories}
+                areaLabel={localMapAnswer.jobs.length ? "Moves & growth" : undefined}
+              />
+            </div>
           )}
 
-          {expanded && localMapAnswer?.bizStories && localMapAnswer.bizStories.length > 0 && (
-            <MapBizJournalPanel
-              stories={localMapAnswer.bizStories}
-              areaLabel={localMapAnswer.jobs.length ? "Moves & growth" : undefined}
-            />
-          )}
-
-          {expanded && showTransitPanel && (
-            <div className="pointer-events-auto">
+          {expanded && !hasJobResults && showTransitPanel && (
+            <div className={cn("pointer-events-auto mt-2", selectedCounty && "max-lg:hidden")}>
               <MapTransitPanel metro={transitIntent?.transitMetro} />
             </div>
           )}
 
           {expanded && !hasJobResults && localMapAnswer?.countyFocus && (
-            <MapGranularInsight focus={localMapAnswer.countyFocus} />
+            <div className={cn("mt-2 hidden lg:block")}>
+              <MapGranularInsight focus={localMapAnswer.countyFocus} />
+            </div>
           )}
 
           {expanded && !hasJobResults && !localMapAnswer?.countyFocus && (
-            <AnswerCard className="pointer-events-auto">
+            <AnswerCard className="pointer-events-auto mt-2 hidden lg:block">
               <div className="px-4 py-3.5">
                 <MapInsightPanel showLegend />
               </div>

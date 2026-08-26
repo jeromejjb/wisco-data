@@ -91,3 +91,19 @@ export function metricLabelForExplorer(metric: ChoroplethMetric | null): string 
   if (!metric) return "Map layer";
   return metricShortLabel(metric);
 }
+
+/** Extra map-layer tile — skipped when it would duplicate unemployment or featured stats. */
+export function choroplethTileForExplorer(
+  snapshot: CountyExplorerSnapshot
+): { label: string; value: string; hint: string } | null {
+  const metric = snapshot.choroplethMetric;
+  if (!metric || !snapshot.choroplethFormatted) return null;
+  if (metric === "unemployment") return null;
+  if (metric === "open-jobs" && snapshot.featuredEconomy?.openJobs != null) return null;
+  if (metric === "median-wage" && snapshot.featuredEconomy?.medianWage != null) return null;
+  return {
+    label: metricLabelForExplorer(metric),
+    value: snapshot.choroplethFormatted,
+    hint: "Map layer",
+  };
+}

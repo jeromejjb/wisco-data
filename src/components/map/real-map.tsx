@@ -11,6 +11,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { MapProps } from "./workways-map";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { mapFlyDurationMs } from "@/lib/motion";
 import {
   getRasterBasemapStyle,
   getMapStyleUrl,
@@ -40,6 +42,7 @@ export default function RealMap({
   const markersRef = useRef<Marker[]>([]);
   const skipStyleChangeRef = useRef(true);
   const darkMode = useAppStore((s) => s.darkMode);
+  const reducedMotion = usePrefersReducedMotion();
 
   const style = hasMapboxToken()
     ? getMapStyleUrl("streets", darkMode)
@@ -180,8 +183,13 @@ export default function RealMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    map.flyTo({ center: [center.lng, center.lat], zoom, duration: 800 });
-  }, [center.lat, center.lng, zoom]);
+    map.flyTo({
+      center: [center.lng, center.lat],
+      zoom,
+      duration: mapFlyDurationMs(reducedMotion, false),
+      essential: false,
+    });
+  }, [center.lat, center.lng, zoom, reducedMotion]);
 
   return (
     <div

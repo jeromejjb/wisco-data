@@ -4,6 +4,9 @@ import { ConditionalHeader } from "@/components/layout/conditional-header";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { AgentShellProvider } from "@/components/agent/agent-shell";
+import { SkipLinks } from "@/components/a11y/skip-link";
+import { LiveAnnouncerProvider } from "@/components/a11y/live-announcer";
+import { MotionRoot } from "@/components/a11y/motion-root";
 import { MAP_TILE_ORIGINS } from "@/lib/map-styles";
 import "./globals.css";
 
@@ -59,12 +62,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <link rel="preload" href="/data/wi-counties.geojson" as="fetch" crossOrigin="anonymous" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <SkipLinks />
         <ThemeProvider>
-          <AgentShellProvider>
-            <ConditionalHeader />
-            <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-            <ConditionalFooter />
-          </AgentShellProvider>
+          <MotionRoot>
+            <LiveAnnouncerProvider>
+              <AgentShellProvider>
+                <ConditionalHeader />
+                <main id="main-content" className="flex min-h-0 flex-1 flex-col" tabIndex={-1}>
+                  {children}
+                </main>
+                <ConditionalFooter />
+              </AgentShellProvider>
+            </LiveAnnouncerProvider>
+          </MotionRoot>
         </ThemeProvider>
       </body>
     </html>

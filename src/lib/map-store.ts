@@ -63,6 +63,8 @@ type MapState = {
   clearSelectedCounty: () => void;
   applyAction: (action: MapAction) => void;
   applyActions: (actions: MapAction[]) => void;
+  /** Highlight a job pin and fly to it in one store update — no map paint flash. */
+  focusMarker: (id: string, coords?: Coordinates) => void;
   resetMap: () => void;
 };
 
@@ -148,53 +150,73 @@ export const useMapStore = create<MapState>((set, get) => ({
   clearSelectedCounty: () => set({ selectedCounty: null, highlightedCounties: [] }),
 
   applyAction: (action) => {
-    switch (action.type) {
-      case "flyTo":
-        set({
-          center: action.center,
-          zoom: action.zoom ?? get().zoom,
-          pitch: action.pitch ?? get().pitch,
-          bearing: action.bearing ?? get().bearing,
-          flyToNonce: get().flyToNonce + 1,
-        });
-        break;
-      case "setChoropleth":
-        set({
-          choroplethMetric: action.metric,
-          choroplethValues: action.values,
-          choroplethLabels: action.labels ?? {},
-          mapPaintNonce: get().mapPaintNonce + 1,
-        });
-        break;
-      case "setMarkers":
-        set({ markers: action.markers, mapPaintNonce: get().mapPaintNonce + 1 });
-        break;
-      case "highlightCounties":
-        set({ highlightedCounties: action.countyIds });
-        break;
-      case "drawRoute":
-        set({
-          routeCoordinates: action.coordinates,
-          routeColor: action.color ?? "#1e6b9c",
-        });
-        break;
-      case "clearRoute":
-        set({ routeCoordinates: [] });
-        break;
-      case "clearHighlights":
-        set({ highlightedCounties: [] });
-        break;
-      case "reset":
-        set({ ...initialState, flyToNonce: get().flyToNonce + 1 });
-        break;
-    }
+    set((s) => reduceMapAction(s, action));
   },
 
   applyActions: (actions) => {
-    actions.forEach((a) => get().applyAction(a));
+    if (!actions.length) return;
+    set((s) => actions.reduce((acc, action) => reduceMapAction(acc, action), s));
+  },
+
+  focusMarker: (id, coords) => {
+    set((s) => ({
+      markers: s.markers.map((m) => ({ ...m, selected: m.id === id })),
+      ...(coords
+        ? {
+            center: coords,
+            zoom: 12.2,
+            pitch: 36,
+            flyToNonce: s.flyToNonce + 1,
+          }
+        : {}),
+    }));
   },
 
   resetMap: () => {
     set({ ...initialState, flyToNonce: get().flyToNonce + 1 });
   },
 }));
+
+function reduceMapAction(s: MapState, action: MapAction): MapState {
+  switch (action.type) {
+    case "flyTo":
+      return {
+        ...s,
+        center: action.center,
+        zoom: action.zoom ?? s.zoom,
+        pitch: action.pitch ?? s.pitch,
+        bearing: action.bearing ?? s.bearing,
+        flyToNonce: s.flyToNonce + 1,
+      };
+    case "setChoropleth":
+      return {
+        ...s,
+        choroplethMetric: action.metric,
+        choroplethValues: action.values,
+        choroplethLabels: action.labels ?? {},
+        mapPaintNonce: s.mapPaintNonce + 1,
+      };
+    case "setMarkers":
+      return {
+        ...s,
+        markers: action.markers,
+        mapPaintNonce: s.mapPaintNonce + 1,
+      };
+    case "highlightCounties":
+      return { ...s, highlightedCounties: action.countyIds };
+    case "drawRoute":
+      return {
+        ...s,
+        routeCoordinates: action.coordinates,
+        routeColor: action.color ?? "#1e6b9c",
+      };
+    case "clearRoute":
+      return { ...s, routeCoordinates: [] };
+    case "clearHighlights":
+      return { ...s, highlightedCounties: [] };
+    case "reset":
+      return { ...s, ...initialState, flyToNonce: s.flyToNonce + 1 };
+    default:
+      return s;
+  }
+}

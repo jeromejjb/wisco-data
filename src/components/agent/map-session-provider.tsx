@@ -200,35 +200,65 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
     syncAnswerPin(question, displayAnswer, isLoading, area, loadingMessage);
   }, [question, displayAnswer, isLoading, area, loadingMessage]);
 
-  const value: MapSessionContextValue = {
-    messages,
-    sendMessage,
-    isLoading,
-    isStreamingAssistant,
-    error,
-    answer,
-    question,
-    hasAnswer,
-    showAnswerStack,
-    starters,
-    area,
-    meta,
-    areaLoading,
-    newsLoading,
-    newsSentiment,
-    newsMapPins,
-    newsPromptsEnabled,
-    setNewsPromptsEnabled,
-    browserLocationEnabled,
-    setBrowserLocationEnabled,
-    trackStarterClick,
-    gatheringMessages,
-    loadingMessage,
-    localMapAnswer,
-    displayAnswer,
-    agentError: error,
-    agentErrorInfo,
-  };
+  const value = useMemo<MapSessionContextValue>(
+    () => ({
+      messages,
+      sendMessage,
+      isLoading,
+      isStreamingAssistant,
+      error,
+      answer,
+      question,
+      hasAnswer,
+      showAnswerStack,
+      starters,
+      area,
+      meta,
+      areaLoading,
+      newsLoading,
+      newsSentiment,
+      newsMapPins,
+      newsPromptsEnabled,
+      setNewsPromptsEnabled,
+      browserLocationEnabled,
+      setBrowserLocationEnabled,
+      trackStarterClick,
+      gatheringMessages,
+      loadingMessage,
+      localMapAnswer,
+      displayAnswer,
+      agentError: error,
+      agentErrorInfo,
+    }),
+    [
+      messages,
+      sendMessage,
+      isLoading,
+      isStreamingAssistant,
+      error,
+      answer,
+      question,
+      hasAnswer,
+      showAnswerStack,
+      starters,
+      area,
+      meta,
+      areaLoading,
+      newsLoading,
+      newsSentiment,
+      newsMapPins,
+      newsPromptsEnabled,
+      setNewsPromptsEnabled,
+      browserLocationEnabled,
+      setBrowserLocationEnabled,
+      trackStarterClick,
+      gatheringMessages,
+      loadingMessage,
+      localMapAnswer,
+      displayAnswer,
+      agentErrorInfo,
+    ]
+  );
 
   return (
     <MapSessionContext.Provider value={value}>
@@ -239,6 +269,7 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
         error={error}
         onApplied={onMapPainted}
         area={area}
+        newsEnabled={newsPromptsEnabled}
       />
       {children}
     </MapSessionContext.Provider>
@@ -252,13 +283,15 @@ function LocalMapAnswerRunner({
   error,
   onApplied,
   area,
+  newsEnabled,
 }: {
   messages: WorkwaysAgentMessage[];
   status: string;
   error: Error | undefined;
   onApplied?: () => void;
   area: ReturnType<typeof useLocalPrompts>["area"];
+  newsEnabled: boolean;
 }) {
-  useLocalMapAnswer(messages, status, error, onApplied, area);
+  useLocalMapAnswer(messages, status, error, onApplied, area, newsEnabled);
   return null;
 }
