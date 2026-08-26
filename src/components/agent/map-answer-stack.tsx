@@ -23,6 +23,7 @@ export function MapAnswerStack() {
   const {
     showAnswerStack,
     displayAnswer,
+    answer,
     question,
     isLoading,
     isStreamingAssistant,
@@ -45,18 +46,36 @@ export function MapAnswerStack() {
     if (question !== lastQuestionRef.current) {
       lastQuestionRef.current = question;
       const narrow = window.matchMedia("(max-width: 1023px)").matches;
-      setExpanded(!narrow);
+      const intent = inferMapQueryIntent(question);
+      const likelyStructured = Boolean(
+        intent?.metric ||
+          intent?.searchJobs ||
+          intent?.bizJournalNews ||
+          intent?.localNews
+      );
+      setExpanded(!narrow || likelyStructured);
       setSelectedJobId(null);
       if (stackRef.current) stackRef.current.scrollTo({ top: 0 });
     }
   }, [question]);
 
   useEffect(() => {
+    if (
+      localMapAnswer?.countyFocus ||
+      localMapAnswer?.bizStories?.length ||
+      localMapAnswer?.subline
+    ) {
+      setExpanded(true);
+    }
+  }, [localMapAnswer]);
+
+  useEffect(() => {
     if (!selectedCounty || hasJobResults) return;
+    if (localMapAnswer?.countyFocus || localMapAnswer?.bizStories?.length) return;
     if (window.matchMedia("(max-width: 1023px)").matches) {
       setExpanded(false);
     }
-  }, [selectedCounty, selectedCounty?.fips, hasJobResults]);
+  }, [selectedCounty, selectedCounty?.fips, hasJobResults, localMapAnswer]);
   const transitIntent = inferMapQueryIntent(question);
   const showTransitPanel = Boolean(
     transitIntent?.transitMetro ||
@@ -196,12 +215,19 @@ export function MapAnswerStack() {
                   />
                 ) : (
                   <>
-                    {question && !localMapAnswer?.countyFocus && (
+                    {question ? (
                       <p className="text-[12px] leading-snug text-white/45">{question}</p>
-                    )}
-                    {localMapAnswer?.subline && !localMapAnswer.countyFocus && (
-                      <p className="text-[12px] leading-relaxed text-white/60">{localMapAnswer.subline}</p>
-                    )}
+                    ) : null}
+                    {localMapAnswer?.subline ? (
+                      <p className="text-[12px] leading-relaxed text-white/60">
+                        {localMapAnswer.subline}
+                      </p>
+                    ) : null}
+                    {answer &&
+                    answer !== displayAnswer &&
+                    answer !== localMapAnswer?.headline ? (
+                      <p className="text-[13px] leading-relaxed text-white/75">{answer}</p>
+                    ) : null}
                     <MapLegendHint>
                       {localMapAnswer?.bizStories?.length ? (
                         <span>Journal pins on the map · tap for a story</span>
@@ -224,6 +250,11 @@ export function MapAnswerStack() {
             <div className={cn("mt-2", selectedCounty && "max-lg:hidden")}>
               <MapBizJournalPanel
                 stories={localMapAnswer.bizStories}
+                heading={
+                  localMapAnswer.bizStories.some((story) => story.source !== "biz-journal")
+                    ? "Local news"
+                    : "Business journals"
+                }
                 areaLabel={localMapAnswer.jobs.length ? "Moves & growth" : undefined}
               />
             </div>
@@ -236,13 +267,13 @@ export function MapAnswerStack() {
           )}
 
           {expanded && !hasJobResults && localMapAnswer?.countyFocus && (
-            <div className={cn("mt-2 hidden lg:block")}>
+            <div className={cn("mt-2", selectedCounty && "max-lg:hidden")}>
               <MapGranularInsight focus={localMapAnswer.countyFocus} />
             </div>
           )}
 
-          {expanded && !hasJobResults && !localMapAnswer?.countyFocus && (
-            <AnswerCard className="pointer-events-auto mt-2 hidden lg:block">
+          {expanded && !hasJobResults && !localMapAnswer?.countyFocus && transitIntent?.metric && (
+            <AnswerCard className={cn("pointer-events-auto mt-2", selectedCounty && "max-lg:hidden")}>
               <div className="px-4 py-3.5">
                 <MapInsightPanel showLegend />
               </div>

@@ -8,6 +8,7 @@ import { AnswerCard, AnswerSectionHeader } from "./answer-panel-chrome";
 type MapBizJournalPanelProps = {
   stories: AreaNewsItem[];
   areaLabel?: string;
+  heading?: string;
 };
 
 const listVariants = {
@@ -20,7 +21,11 @@ const itemVariants = {
   visible: { opacity: 1, x: 0, transition: { type: "spring" as const, stiffness: 320, damping: 28 } },
 };
 
-export function MapBizJournalPanel({ stories, areaLabel }: MapBizJournalPanelProps) {
+export function MapBizJournalPanel({
+  stories,
+  areaLabel,
+  heading = "Business journals",
+}: MapBizJournalPanelProps) {
   if (!stories.length) return null;
 
   return (
@@ -31,7 +36,7 @@ export function MapBizJournalPanel({ stories, areaLabel }: MapBizJournalPanelPro
     >
       <AnswerCard>
         <AnswerSectionHeader
-          label="Business journals"
+          label={heading}
           meta={
             areaLabel ? (
               <span className="text-[10px] font-medium text-white/45">{areaLabel}</span>

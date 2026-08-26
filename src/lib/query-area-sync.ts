@@ -59,13 +59,16 @@ export function applyQueryAreaSync(text: string): boolean {
     { type: "highlightCounties", countyIds: [area.countyId] },
   ]);
 
-  const fips = fipsFromCountyId(area.countyId);
-  if (fips) {
-    useMapStore.getState().selectCounty({
-      fips,
-      name: area.displayName,
-      countyId: area.countyId,
-    });
+  const openCountySheet = Boolean(intent?.searchJobs);
+  if (openCountySheet) {
+    const fips = fipsFromCountyId(area.countyId);
+    if (fips) {
+      useMapStore.getState().selectCounty({
+        fips,
+        name: area.displayName,
+        countyId: area.countyId,
+      });
+    }
   }
 
   return true;

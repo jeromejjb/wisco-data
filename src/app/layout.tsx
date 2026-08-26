@@ -60,6 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <link key={origin} rel="preconnect" href={origin} crossOrigin="anonymous" />
         ))}
         <link rel="preload" href="/data/wi-counties.geojson" as="fetch" crossOrigin="anonymous" />
+        <link rel="preload" href="/data/wi-state.geojson" as="fetch" crossOrigin="anonymous" />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SkipLinks />
