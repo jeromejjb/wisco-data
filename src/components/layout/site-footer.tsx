@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DataSourceLinks } from "@/components/layout/data-source-links";
+import { APP_VERSION_LABEL } from "@/lib/app-version";
 import { SITE, TECH_STACK } from "@/lib/site-meta";
 
 type SiteFooterProps = {
@@ -20,6 +21,7 @@ export function SiteFooter({ variant = "full" }: SiteFooterProps) {
         <div className="pointer-events-auto m-4 rounded-xl border border-black/[0.06] bg-white/90 px-3 py-2 shadow-lg backdrop-blur-md dark:border-white/10 dark:bg-navy-900/90">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
             <span className="font-semibold text-foreground/80">{SITE.name}</span>
+            <span className="font-mono text-[10px] text-muted-foreground/80">{APP_VERSION_LABEL}</span>
             <FooterLegalLinks className="gap-2" />
           </div>
         </div>
@@ -112,8 +114,8 @@ export function SiteFooter({ variant = "full" }: SiteFooterProps) {
 
         <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-relaxed text-white/40">
-            © {year} {SITE.name}. Not an official Wisconsin state website. Commute times and job
-            listings are estimates — always confirm with employers and transit agencies.
+            © {year} {SITE.name} {APP_VERSION_LABEL}. Not an official Wisconsin state website. Commute
+            times and job listings are estimates — always confirm with employers and transit agencies.
           </p>
           <FooterLegalLinks className="text-xs text-white/50" />
         </div>

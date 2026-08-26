@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
+import { APP_VERSION_LABEL } from "@/lib/app-version";
 
 /** Minimal brand mark — only chrome on the home map screen. */
 export function WorkspaceLogo() {
@@ -14,7 +15,9 @@ export function WorkspaceLogo() {
           <p className="font-display text-[15px] font-semibold tracking-tight text-[#0c1222]">
             Workways
           </p>
-          <p className="text-[11px] font-medium text-[#5a6278]">Wisconsin · live map</p>
+          <p className="text-[11px] font-medium text-[#5a6278]">
+            Wisconsin · {APP_VERSION_LABEL}
+          </p>
         </div>
       </div>
     </div>

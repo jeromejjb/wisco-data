@@ -3,7 +3,7 @@ export const SITE = {
   name: "Wisconsin Workways",
   tagline: "Jobs, economics, and transit — on one Wisconsin map.",
   contactEmail: "hello@wiscoworkways.app",
-  lastUpdated: "August 22, 2026",
+  lastUpdated: "August 25, 2026",
 } as const;
 
 export const TECH_STACK = [
