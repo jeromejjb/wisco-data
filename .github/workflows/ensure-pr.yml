@@ -1,0 +1,32 @@
+name: Ensure pull request
+
+# If work lands on an issue/* branch with no open PR into main, open one.
+# Covers follow-up commits after the first PR for that branch already merged.
+
+on:
+  push:
+    branches:
+      - "issue/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  ensure:
+    name: Open PR into main if missing
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ensure pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: node scripts/ensure-pr.mjs

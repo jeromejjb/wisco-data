@@ -4,7 +4,12 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches:
+      - main
+      # Same-SHA checks still attach to a PR opened by GITHUB_TOKEN (that
+      # event does not start workflows). Feature-branch pushes therefore
+      # run CI here so the PR is never blank.
+      - "issue/**"
   workflow_dispatch:
 
 concurrency:
