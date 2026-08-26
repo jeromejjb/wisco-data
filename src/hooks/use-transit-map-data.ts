@@ -56,7 +56,7 @@ export type TransitApiPayload = {
     };
     mapCenter: { lat: number; lng: number };
     mapZoom: number;
-    activeAgencyId: TransitAgencyId;
+    activeAgencyId: string;
   };
   provenance: DataProvenance;
 };

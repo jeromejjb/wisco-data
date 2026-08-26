@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   StatCard,
   UnemploymentChart,
@@ -9,21 +9,21 @@ import {
   CountyCompareRow,
 } from "@/components/charts/economy-charts";
 import { WorkwaysMap } from "@/components/map/workways-map";
+import { MapLegend } from "@/components/map/map-legend";
 import { SourcePanel, PageHero } from "@/components/data/source-panel";
 import { LiveBadge } from "@/components/ui/live-badge";
 import { Skeleton } from "@/components/ui/states";
 import { useEconomyData } from "@/hooks/use-live-data";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { EconomyMetric } from "@/lib/types";
+import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-const layerOptions: { id: EconomyMetric; label: string }[] = [
-  { id: "unemployment", label: "Unemployment" },
-  { id: "job-openings", label: "Job openings" },
-  { id: "median-wage", label: "Median wage" },
-  { id: "transit-coverage", label: "Transit coverage" },
-  { id: "transit-jobs", label: "Transit-accessible jobs" },
+const layerOptions: { id: EconomyMetric; label: string; metric: ChoroplethMetric }[] = [
+  { id: "unemployment", label: "Unemployment", metric: "unemployment" },
+  { id: "job-openings", label: "Job openings", metric: "open-jobs" },
+  { id: "median-wage", label: "Median wage", metric: "median-wage" },
 ];
 
 export default function ExplorePage() {
@@ -33,21 +33,23 @@ export default function ExplorePage() {
   const [compareRight, setCompareRight] = useState("dane");
 
   const economy = data?.data;
-  const counties = economy?.counties ?? [];
+  const counties = useMemo(() => economy?.counties ?? [], [economy?.counties]);
   const stats = economy?.statewide;
   const leftCounty = counties.find((c) => c.id === compareLeft);
   const rightCounty = counties.find((c) => c.id === compareRight);
+  const active = layerOptions.find((l) => l.id === activeLayer) ?? layerOptions[0]!;
 
-  const mapMarkers = counties.map((c) => ({
-    id: c.id,
-    coordinates: c.coordinates,
-    color:
-      activeLayer === "unemployment"
-        ? c.unemploymentRate > 3.5 ? "#d4824a" : "#1e6b9c"
-        : activeLayer === "median-wage"
-          ? "#267a55"
-          : "#1e6b9c",
-  }));
+  const choroplethValues = useMemo(() => {
+    if (active.id === "unemployment" && economy?.unemploymentByFips) {
+      return economy.unemploymentByFips;
+    }
+    const values: Record<string, number> = {};
+    for (const c of counties) {
+      if (active.id === "median-wage" && c.medianWage != null) values[c.fips] = c.medianWage;
+      if (active.id === "job-openings" && c.openJobs != null) values[c.fips] = c.openJobs;
+    }
+    return values;
+  }, [active.id, counties, economy?.unemploymentByFips]);
 
   const avgOpportunity = counties.length
     ? Math.round(counties.reduce((s, c) => s + c.opportunityIndex, 0) / counties.length)
@@ -80,10 +82,18 @@ export default function ExplorePage() {
               <OpportunityIndex score={avgOpportunity} />
               {stats && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatCard label="Unemployment" value={formatPercent(stats.unemploymentRate)} live />
-                  <StatCard label="Est. openings" value={stats.openJobs.toLocaleString()} live />
-                  <StatCard label="Median wage" value={formatCurrency(stats.medianWage)} live />
-                  <StatCard label="LFPR" value={formatPercent(stats.laborForceParticipation)} live />
+                  {stats.unemploymentRate != null && (
+                    <StatCard label="Unemployment" value={formatPercent(stats.unemploymentRate)} live />
+                  )}
+                  {stats.openJobs != null && (
+                    <StatCard label="Est. openings" value={stats.openJobs.toLocaleString()} live />
+                  )}
+                  {stats.medianWage != null && (
+                    <StatCard label="Median wage" value={formatCurrency(stats.medianWage)} live />
+                  )}
+                  {stats.laborForceParticipation != null && (
+                    <StatCard label="LFPR" value={formatPercent(stats.laborForceParticipation)} live />
+                  )}
                 </div>
               )}
             </div>
@@ -106,14 +116,18 @@ export default function ExplorePage() {
 
             <div className="grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <WorkwaysMap
-                  center={{ lat: 44.2, lng: -89.5 }}
-                  zoom={6.5}
-                  markers={mapMarkers}
-                  className="h-[500px] shadow-xl"
-                />
+                <div className="relative">
+                  <WorkwaysMap
+                    center={{ lat: 44.2, lng: -89.5 }}
+                    zoom={6.5}
+                    choroplethMetric={active.metric}
+                    choroplethValues={choroplethValues}
+                    className="h-[500px] shadow-xl"
+                  />
+                  <MapLegend metric={active.metric} className="absolute bottom-4 left-4 z-10" />
+                </div>
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Live county markers · {layerOptions.find((l) => l.id === activeLayer)?.label} · QCEW + WisConomy
+                  {Object.keys(choroplethValues).length} counties · {active.label} · WisConomy + QCEW where available
                 </p>
               </div>
               {data?.provenance && (
@@ -162,8 +176,8 @@ export default function ExplorePage() {
                 </CardHeader>
                 <CardContent>
                   <CountyCompareRow metric="Unemployment" left={{ name: leftCounty.name, value: leftCounty.unemploymentRate }} right={{ name: rightCounty.name, value: rightCounty.unemploymentRate }} format={(v) => formatPercent(v)} />
-                  <CountyCompareRow metric="Median wage" left={{ name: leftCounty.name, value: leftCounty.medianWage }} right={{ name: rightCounty.name, value: rightCounty.medianWage }} format={(v) => formatCurrency(v)} />
-                  <CountyCompareRow metric="Est. openings" left={{ name: leftCounty.name, value: leftCounty.openJobs }} right={{ name: rightCounty.name, value: rightCounty.openJobs }} format={(v) => v.toLocaleString()} />
+                  <CountyCompareRow metric="Median wage" left={{ name: leftCounty.name, value: leftCounty.medianWage ?? 0 }} right={{ name: rightCounty.name, value: rightCounty.medianWage ?? 0 }} format={(v) => (v ? formatCurrency(v) : "—")} />
+                  <CountyCompareRow metric="Est. openings" left={{ name: leftCounty.name, value: leftCounty.openJobs ?? 0 }} right={{ name: rightCounty.name, value: rightCounty.openJobs ?? 0 }} format={(v) => (v ? v.toLocaleString() : "—")} />
                   <CountyCompareRow metric="Opportunity Index" left={{ name: leftCounty.name, value: leftCounty.opportunityIndex }} right={{ name: rightCounty.name, value: rightCounty.opportunityIndex }} />
                 </CardContent>
               </Card>
@@ -179,9 +193,9 @@ export default function ExplorePage() {
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <div><p className="text-xs text-muted-foreground">Unemployment</p><p className="font-semibold tabular-nums">{formatPercent(county.unemploymentRate)}</p></div>
-                      <div><p className="text-xs text-muted-foreground">Median wage</p><p className="font-semibold tabular-nums">{formatCurrency(county.medianWage, true)}</p></div>
-                      <div><p className="text-xs text-muted-foreground">Est. openings</p><p className="font-semibold tabular-nums">{county.openJobs.toLocaleString()}</p></div>
-                      <div><p className="text-xs text-muted-foreground">Transit jobs</p><p className="font-semibold tabular-nums">{formatPercent(county.transitAccessibleJobShare)}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Median wage</p><p className="font-semibold tabular-nums">{county.medianWage != null ? formatCurrency(county.medianWage, true) : "—"}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Est. openings</p><p className="font-semibold tabular-nums">{county.openJobs != null ? county.openJobs.toLocaleString() : "—"}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Labor force</p><p className="font-semibold tabular-nums">{county.laborForceParticipation != null ? formatPercent(county.laborForceParticipation) : "—"}</p></div>
                     </div>
                   </CardContent>
                 </Card>

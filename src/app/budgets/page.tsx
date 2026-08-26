@@ -6,7 +6,7 @@ import { BudgetBarChart } from "@/components/charts/economy-charts";
 import { WorkwaysMap } from "@/components/map/workways-map";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DataFreshness } from "@/components/ui/states";
+import { DataFreshness, SampleDataBanner } from "@/components/ui/states";
 import { budgetsAdapter } from "@/services/adapters";
 import { formatCurrency } from "@/lib/utils";
 
@@ -30,9 +30,14 @@ export default function BudgetsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold lg:text-3xl">Budgets & Investment</h1>
         <p className="mt-1 max-w-2xl text-muted-foreground">
-          How public money and economic investment relate to jobs, transportation, and neighborhoods.
+          Sample budget figures showing how public money could be explored next to jobs and transit.
         </p>
       </div>
+
+      <SampleDataBanner>
+        Budget totals and capital projects on this page are <strong>illustrative sample data</strong>,
+        not scraped from live municipal budget PDFs.
+      </SampleDataBanner>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-1">

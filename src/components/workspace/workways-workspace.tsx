@@ -20,7 +20,7 @@ const AgentMap = dynamic(
   () => import("@/components/map/agent-map").then((m) => m.AgentMap),
   {
     ssr: false,
-    loading: () => <div className="absolute inset-0 bg-[#e8eef4]" aria-hidden />,
+    loading: () => <div className="absolute inset-0 bg-[#e8eef4] dark:bg-[#070b14]" aria-hidden />,
   }
 );
 
@@ -85,7 +85,7 @@ function WorkspaceInner() {
   }, [seed, applyActions, setMapDemographics]);
 
   return (
-    <div className="fixed inset-0 z-0 h-dvh w-full overflow-hidden bg-[#e8eef4]">
+    <div className="fixed inset-0 z-0 h-dvh w-full overflow-hidden bg-[#e8eef4] dark:bg-[#070b14]">
       <AgentMap className="absolute inset-0 h-full w-full" immersive defaultStyleId="streets" />
       <WorkspaceLogo />
       <MapCountyPanel />

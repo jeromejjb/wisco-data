@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { buildUserAreaFromGeo, DEFAULT_USER_AREA } from "@/lib/user-area";
+import { buildUserAreaFromGeo } from "@/lib/user-area";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +28,13 @@ export async function GET() {
 
   if (!hasCoords && !city) {
     return NextResponse.json({
-      area: DEFAULT_USER_AREA,
+      area: null,
       meta: {
         resolved: false,
         city: null,
         region,
         country,
-        hint: "No geo headers — defaulting to Milwaukee metro",
+        hint: "No geo headers — showing statewide Wisconsin, not a metro default",
       },
     });
   }

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { Coordinates } from "@/lib/types";
+import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { Skeleton } from "@/components/ui/states";
 
 const RealMap = dynamic(() => import("./real-map"), {
@@ -25,6 +26,8 @@ export type MapProps = {
   onMarkerClick?: (id: string) => void;
   showControls?: boolean;
   interactive?: boolean;
+  choroplethMetric?: ChoroplethMetric | null;
+  choroplethValues?: Record<string, number>;
 };
 
 /** Real MapLibre map — works without API keys (OpenFreeMap) or with Mapbox token for premium layers */

@@ -12,12 +12,12 @@ import {
   refreshAllLiveSources,
   refreshLiveSources,
 } from "@/services/live/refresh";
-import { WI_COUNTIES } from "@/lib/wi-counties";
 import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
 import { countyIdsFromText } from "@/lib/county-lookup";
+import { WI_COUNTIES, FIPS_BY_COUNTY_ID } from "@/lib/wi-counties";
 
 function countyFipsMap() {
-  return Object.fromEntries(WI_COUNTIES.map((c) => [c.id, c.fips]));
+  return FIPS_BY_COUNTY_ID;
 }
 
 function choroplethFromCounties(
@@ -34,13 +34,13 @@ function choroplethFromCounties(
         values[c.id] = c.opportunityIndex;
         break;
       case "median-wage":
-        values[c.id] = c.medianWage;
+        if (c.medianWage != null) values[c.id] = c.medianWage;
         break;
       case "open-jobs":
-        values[c.id] = c.openJobs;
+        if (c.openJobs != null) values[c.id] = c.openJobs;
         break;
       case "transit-coverage":
-        values[c.id] = c.transitCoverage;
+        if (c.transitCoverage != null) values[c.id] = c.transitCoverage;
         break;
     }
   }
@@ -65,6 +65,25 @@ export function resolveCountyId(input: string): string | undefined {
 
 function getModel(explicit?: LanguageModel) {
   return explicit ?? resolveAgentLanguageModel();
+}
+
+async function drivingPath(
+  origin: { lat: number; lng: number },
+  dest: { lat: number; lng: number }
+): Promise<{ lat: number; lng: number }[]> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${dest.lng},${dest.lat}?overview=simplified&geometries=geojson`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [origin, dest];
+    const json = (await res.json()) as {
+      routes?: { geometry?: { coordinates?: [number, number][] } }[];
+    };
+    const coords = json.routes?.[0]?.geometry?.coordinates;
+    if (!coords?.length) return [origin, dest];
+    return coords.map(([lng, lat]) => ({ lat, lng }));
+  } catch {
+    return [origin, dest];
+  }
 }
 
 export const workwaysTools = {
@@ -107,28 +126,20 @@ export const workwaysTools = {
 
   getTransitSnapshot: tool({
     description:
-      "Fetch live GTFS transit data: MCTS Milwaukee & Madison Metro stops, routes, and service alerts. Shows sample stops on the map.",
+      "Fetch live GTFS transit data for Wisconsin agencies (Milwaukee, Madison, Green Bay, La Crosse, Kenosha, Valley Transit, Eau Claire): stops, routes, and service alerts.",
     inputSchema: z.object({
-      metro: z.enum(["milwaukee", "madison", "both"]).optional(),
+      metro: z
+        .enum(["milwaukee", "madison", "green-bay", "la-crosse", "kenosha", "appleton", "eau-claire", "both", "all"])
+        .optional(),
     }),
-    execute: async ({ metro = "both" }): Promise<ToolResultWithMap> => {
-      const transit = await getLiveTransitData();
-      const stops =
-        metro === "milwaukee"
-          ? transit.stops.filter((s) => s.agency.includes("Milwaukee")).slice(0, 20)
-          : metro === "madison"
-            ? transit.stops.filter((s) => s.agency.includes("Madison")).slice(0, 20)
-            : transit.stops.slice(0, 25);
-
-      const center =
-        metro === "madison"
-          ? { lat: 43.0731, lng: -89.4012 }
-          : metro === "milwaukee"
-            ? { lat: 43.0389, lng: -87.9065 }
-            : { lat: 43.5, lng: -88.5 };
+    execute: async ({ metro = "all" }): Promise<ToolResultWithMap> => {
+      const { agencyIdFromMetro } = await import("@/lib/transit-agencies");
+      const agencyId = agencyIdFromMetro(metro);
+      const transit = await getLiveTransitData({ agencyId });
+      const stops = transit.stops.slice(0, 25);
 
       return {
-        summary: `${transit.stats.totalStops} stops, ${transit.stats.totalRoutes} routes, ${transit.alerts.length} alerts`,
+        summary: `${transit.stats.totalStops} stops, ${transit.stats.totalRoutes} routes, ${transit.alerts.length} alerts across ${transit.stats.agencies} agencies`,
         data: {
           agencies: transit.agencies,
           alerts: transit.alerts.slice(0, 5),
@@ -142,10 +153,10 @@ export const workwaysTools = {
               id: s.id,
               coordinates: { lat: s.lat, lng: s.lng },
               label: s.name,
-              color: s.agency.includes("Madison") ? "#267a55" : "#1e6b9c",
+              color: "#1e6b9c",
             })),
           },
-          { type: "flyTo", center, zoom: metro === "both" ? 7.5 : 11, pitch: 35 },
+          { type: "flyTo", center: transit.mapCenter, zoom: metro === "all" || metro === "both" ? 7 : 11, pitch: 35 },
         ],
       };
     },
@@ -356,11 +367,9 @@ export const workwaysTools = {
 
       if (!data) {
         return {
-          summary: `County not found: ${county}. Available: ${WI_COUNTIES.map((c) => c.name).join(", ")}`,
+          summary: `County not found: ${county}. Try a Wisconsin county name (all 72 are supported).`,
         };
       }
-
-      const wi = WI_COUNTIES.find((c) => c.id === id)!;
 
       return {
         summary: `Economy data for ${data.name}`,
@@ -374,7 +383,7 @@ export const workwaysTools = {
           },
           {
             type: "flyTo",
-            center: { lat: wi.lat, lng: wi.lng },
+            center: { lat: data.coordinates.lat, lng: data.coordinates.lng },
             zoom: 9,
             pitch: 40,
           },
@@ -425,7 +434,7 @@ export const workwaysTools = {
 
   drawTransitRoute: tool({
     description:
-      "Draw a simplified route line on the map between origin and destination coordinates.",
+      "Draw a road path on the map between origin and destination using public OSRM driving geometry. This is not a GTFS trip plan.",
     inputSchema: z.object({
       originLat: z.number(),
       originLng: z.number(),
@@ -436,13 +445,14 @@ export const workwaysTools = {
     execute: async (params): Promise<ToolResultWithMap> => {
       const origin = { lat: params.originLat, lng: params.originLng };
       const dest = { lat: params.destinationLat, lng: params.destinationLng };
+      const coordinates = await drivingPath(origin, dest);
 
       return {
-        summary: params.label ?? "Transit route displayed on map",
+        summary: params.label ?? "Estimated driving path (not a transit itinerary)",
         mapActions: [
           {
             type: "drawRoute",
-            coordinates: [origin, dest],
+            coordinates,
             color: "#267a55",
           },
           {

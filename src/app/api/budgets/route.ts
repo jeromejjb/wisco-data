@@ -18,5 +18,7 @@ export async function GET(request: Request) {
       entities: budgetsAdapter.getEntities(),
       trend: budgetsAdapter.getTrend(),
     },
+    sample: true,
+    note: "Budget figures are illustrative sample data, not live municipal extracts.",
   });
 }
