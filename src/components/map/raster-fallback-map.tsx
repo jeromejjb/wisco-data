@@ -31,7 +31,10 @@ type RasterFallbackMapProps = {
 
 type LeafletNS = typeof import("leaflet");
 
-function tileForStyle(styleId: MapStyleId, darkMode: boolean) {
+function tileForStyle(
+  styleId: MapStyleId,
+  darkMode: boolean
+): { url: string; attribution: string; subdomains?: string } {
   if (styleId === "satellite") {
     return {
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
