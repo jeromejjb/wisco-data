@@ -33,7 +33,10 @@ export function AgentMapBridge({ messages, onMapActionsApplied }: AgentMapBridge
   const applyActions = useMapStore((s) => s.applyActions);
   const processedRef = useRef<Set<string>>(new Set());
   const onMapActionsAppliedRef = useRef(onMapActionsApplied);
-  onMapActionsAppliedRef.current = onMapActionsApplied;
+
+  useEffect(() => {
+    onMapActionsAppliedRef.current = onMapActionsApplied;
+  }, [onMapActionsApplied]);
 
   useEffect(() => {
     for (const message of messages) {

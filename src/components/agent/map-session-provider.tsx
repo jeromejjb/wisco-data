@@ -135,10 +135,14 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   const areaRef = useRef(area);
   const newsRef = useRef(newsItems);
   const sentimentRef = useRef(newsSentiment);
-  areaRef.current = area;
-  newsRef.current = newsItems;
-  sentimentRef.current = newsSentiment;
 
+  useEffect(() => {
+    areaRef.current = area;
+    newsRef.current = newsItems;
+    sentimentRef.current = newsSentiment;
+  }, [area, newsItems, newsSentiment]);
+
+  /* eslint-disable react-hooks/refs -- prepareSendMessagesRequest runs at send time */
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -155,6 +159,7 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
       }),
     []
   );
+  /* eslint-enable react-hooks/refs */
 
   const { messages, sendMessage, status, error } = useChat<WorkwaysAgentMessage>({ transport });
   useSyncQueryArea(messages);
@@ -230,6 +235,7 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
         status={status}
         error={error}
         onApplied={onMapPainted}
+        area={area}
       />
       {children}
     </MapSessionContext.Provider>
@@ -242,12 +248,14 @@ function LocalMapAnswerRunner({
   status,
   error,
   onApplied,
+  area,
 }: {
   messages: WorkwaysAgentMessage[];
   status: string;
   error: Error | undefined;
   onApplied?: () => void;
+  area: ReturnType<typeof useLocalPrompts>["area"];
 }) {
-  useLocalMapAnswer(messages, status, error, onApplied);
+  useLocalMapAnswer(messages, status, error, onApplied, area);
   return null;
 }

@@ -189,6 +189,10 @@ export function AgentMap({
   const choroplethLabelsRef = useRef<Record<string, string>>({});
   const skipStyleChangeRef = useRef(true);
   const addCountyLayersRef = useRef<(map: MapLibreMap) => Promise<void>>(async () => {});
+  const navControlAddedRef = useRef(false);
+  const scaleControlAddedRef = useRef(false);
+  const choroplethSigRef = useRef("");
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const darkMode = useAppStore((s) => s.darkMode);
 
   const [mapStyleId, setMapStyleId] = useState<MapStyleId>(defaultStyleId);
@@ -515,12 +519,9 @@ export function AgentMap({
     [applyChoropleth, choroplethLabels, choroplethMetric, choroplethValues, darkMode, onSatellite, forceLightBasemap]
   );
 
-  addCountyLayersRef.current = addCountyLayers;
-
-  const navControlAddedRef = useRef(false);
-  const scaleControlAddedRef = useRef(false);
-  const choroplethSigRef = useRef("");
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    addCountyLayersRef.current = addCountyLayers;
+  }, [addCountyLayers]);
 
   // Init map once — show basemap immediately, counties layer async
   useEffect(() => {

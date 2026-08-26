@@ -44,13 +44,17 @@ export function useLocalMapAnswer(
   messages: WorkwaysAgentMessage[],
   status: string,
   error: Error | undefined,
-  onApplied?: () => void
+  onApplied?: () => void,
+  area?: { displayName: string; countyId: string }
 ) {
   const applyActions = useMapStore((s) => s.applyActions);
   const setLocalMapAnswer = useMapStore((s) => s.setLocalMapAnswer);
   const processedTurnRef = useRef<string>("");
   const onAppliedRef = useRef(onApplied);
-  onAppliedRef.current = onApplied;
+
+  useEffect(() => {
+    onAppliedRef.current = onApplied;
+  }, [onApplied]);
 
   useEffect(() => {
     if (status === "streaming" || status === "submitted") {
@@ -83,7 +87,7 @@ export function useLocalMapAnswer(
 
     processedTurnRef.current = turnKey;
 
-    void buildLocalMapAnswer(intent).then((answer) => {
+    void buildLocalMapAnswer(intent, { area }).then((answer) => {
       if (!answer) return;
       setLocalMapAnswer(answer);
       if (answer.mapActions.length) {
@@ -94,7 +98,7 @@ export function useLocalMapAnswer(
       }
       onAppliedRef.current?.();
     });
-  }, [messages, status, error, applyActions, setLocalMapAnswer]);
+  }, [messages, status, error, applyActions, setLocalMapAnswer, area]);
 }
 
 /** @deprecated use useLocalMapAnswer */
