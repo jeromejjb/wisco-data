@@ -1,0 +1,35 @@
+name: Feature issues from commits
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      since:
+        description: "Git ref to start from (empty = previous successful run / last 30 commits)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  catalog:
+    name: Open issues for shipped work
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sync feature issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SINCE: ${{ github.event.inputs.since }}
+          EVENT_BEFORE: ${{ github.event.before }}
+        run: node scripts/sync-feature-issues.mjs

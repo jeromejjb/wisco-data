@@ -1,0 +1,214 @@
+#!/usr/bin/env node
+/**
+ * Catalogs git commits / branches and opens GitHub issues that describe
+ * shipped features. Works in GitHub Actions (GITHUB_TOKEN) or locally (gh).
+ *
+ *   node scripts/sync-feature-issues.mjs
+ *   node scripts/sync-feature-issues.mjs --since HEAD~20
+ *   node scripts/sync-feature-issues.mjs --dry-run
+ */
+import { execFileSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const dryRun = process.argv.includes("--dry-run");
+const sinceFlag = process.argv.findIndex((a) => a === "--since");
+const sinceArg =
+  sinceFlag >= 0
+    ? process.argv[sinceFlag + 1]
+    : process.env.SINCE || process.env.EVENT_BEFORE || "";
+
+function git(args) {
+  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function loadCatalog() {
+  const path = join(root, ".github/feature-catalog.json");
+  if (!existsSync(path)) return [];
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function resolveSince() {
+  if (sinceArg && sinceArg !== "0000000000000000000000000000000000000000") {
+    try {
+      git(["rev-parse", "--verify", sinceArg]);
+      return sinceArg;
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    const count = Number(git(["rev-list", "--count", "HEAD"]));
+    if (count > 30) return "HEAD~30";
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+function commitsSince(ref) {
+  const range = ref ? `${ref}..HEAD` : "HEAD";
+  const raw = git(["log", range, "--pretty=format:%H%x09%s%x09%an%x09%cI"]);
+  if (!raw) return [];
+  return raw.split("\n").filter(Boolean).map((line) => {
+    const [sha, subject, author, date] = line.split("\t");
+    return { sha, subject, author, date };
+  });
+}
+
+function branchesVsMain() {
+  const current = git(["rev-parse", "--abbrev-ref", "HEAD"]);
+  let names = [];
+  try {
+    names = git(["branch", "--format=%(refname:short)"]).split("\n").filter(Boolean);
+  } catch {
+    names = [current];
+  }
+  return names
+    .filter((b) => b !== "main" && b !== "master")
+    .map((name) => {
+      let ahead = "0";
+      let behind = "0";
+      try {
+        const [a, b] = git(["rev-list", "--left-right", "--count", `main...${name}`]).split(
+          /\s+/
+        );
+        behind = a ?? "0";
+        ahead = b ?? "0";
+      } catch {
+        /* no main yet */
+      }
+      return { name, ahead, behind };
+    });
+}
+
+function issueExists(title, token, repo) {
+  if (!token || !repo) return false;
+  const [owner, name] = repo.split("/");
+  const url = `https://api.github.com/search/issues?q=${encodeURIComponent(
+    `repo:${owner}/${name} in:title "${title.replace(/"/g, "")}" state:open`
+  )}`;
+  try {
+    const res = execFileSync(
+      "curl",
+      ["-sS", "-H", `Authorization: Bearer ${token}`, "-H", "Accept: application/vnd.github+json", url],
+      { encoding: "utf8" }
+    );
+    const json = JSON.parse(res);
+    return (json.total_count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+function createIssue({ title, body, labels }, token, repo) {
+  if (dryRun) {
+    console.log(`\n--- DRY RUN: would open issue ---\n# ${title}\n${body}\n`);
+    return;
+  }
+  if (!token || !repo) {
+    console.log(`\n--- Draft (no GitHub auth) ---\n# ${title}\n${body}\n`);
+    return;
+  }
+  if (issueExists(title, token, repo)) {
+    console.log(`Skip existing issue: ${title}`);
+    return;
+  }
+  const [owner, name] = repo.split("/");
+  const payload = JSON.stringify({ title, body, labels });
+  const res = execFileSync(
+    "curl",
+    [
+      "-sS",
+      "-X",
+      "POST",
+      "-H",
+      `Authorization: Bearer ${token}`,
+      "-H",
+      "Accept: application/vnd.github+json",
+      "-H",
+      "Content-Type: application/json",
+      `https://api.github.com/repos/${owner}/${name}/issues`,
+      "-d",
+      payload,
+    ],
+    { encoding: "utf8" }
+  );
+  const json = JSON.parse(res);
+  if (json.html_url) console.log(`Opened ${json.html_url}`);
+  else console.error("Failed to create issue:", json.message ?? res);
+}
+
+function commitIssue(commits, branches) {
+  if (!commits.length) return null;
+  const lines = commits
+    .map((c) => `- \`${c.sha.slice(0, 7)}\` ${c.subject} (${c.date.slice(0, 10)})`)
+    .join("\n");
+  const branchLines = branches.length
+    ? branches
+        .map((b) => `- \`${b.name}\` · ${b.ahead} ahead / ${b.behind} behind main`)
+        .join("\n")
+    : "_No extra local branches._";
+
+  return {
+    title: `Shipped: ${commits.length} commit${commits.length === 1 ? "" : "s"} on main`,
+    labels: ["feature", "automated"],
+    body: [
+      "This issue was opened by the feature-sync pipeline from git history.",
+      "",
+      "## Commits",
+      lines,
+      "",
+      "## Other branches",
+      branchLines,
+      "",
+      "_Generated by `scripts/sync-feature-issues.mjs`._",
+    ].join("\n"),
+  };
+}
+
+function main() {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+  const repo = process.env.GITHUB_REPOSITORY || "";
+  const since = resolveSince();
+  const commits = commitsSince(since);
+  const branches = branchesVsMain();
+  const catalog = loadCatalog();
+
+  console.log(`Since: ${since || "(all recent)"}`);
+  console.log(`Commits: ${commits.length}`);
+  console.log(`Extra branches: ${branches.length || "none"}`);
+
+  for (const feature of catalog) {
+    createIssue(
+      {
+        title: feature.title,
+        labels: feature.labels ?? ["feature"],
+        body: [
+          feature.body,
+          "",
+          feature.commits?.length
+            ? `Related commits:\n${feature.commits.map((c) => `- ${c}`).join("\n")}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      },
+      token,
+      repo
+    );
+  }
+
+  const fromGit = commitIssue(commits, branches);
+  if (fromGit) createIssue(fromGit, token, repo);
+
+  if (!token || !repo) {
+    console.log(
+      "\nNo GitHub remote/token. Drafts printed above. After `gh auth login` and a remote:\n  GITHUB_REPOSITORY=owner/repo GITHUB_TOKEN=$(gh auth token) node scripts/sync-feature-issues.mjs"
+    );
+  }
+}
+
+main();

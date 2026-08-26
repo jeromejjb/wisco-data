@@ -1,0 +1,32 @@
+[
+  {
+    "title": "News feeds follow the searched market, not Milwaukee by default",
+    "labels": ["feature", "map"],
+    "body": "The Business Journals panel used to fall back to Milwaukee whenever the county was outside the 10 featured metros (e.g. searching jobs in La Crosse). `/api/news` now resolves any of Wisconsin’s 72 counties, La Crosse has its own biz feed, and Milwaukee-only headlines are filtered out of other markets."
+  },
+  {
+    "title": "Graceful rate-limit copy with a retry window",
+    "labels": ["feature", "ux"],
+    "body": "429 / quota errors no longer read as hard failures. The map dock and jobs banners explain that sources are cooling down, include a human retry window (about 5 minutes, or Retry-After when present), and keep live map data available."
+  },
+  {
+    "title": "Statewide transit map: routes, stops, and live vehicles",
+    "labels": ["feature", "transit"],
+    "body": "Seven Wisconsin agencies (MCTS, Madison Metro, Green Bay, La Crosse MTU, Kenosha, Valley Transit, Eau Claire) expose GTFS route shapes, stops, and GTFS-RT vehicles where feeds exist. `/transit` has an agency picker, layer toggles, and a mobile bottom sheet for stop/route/bus details."
+  },
+  {
+    "title": "County explorer: one stats panel, readable peer chart",
+    "labels": ["feature", "ux"],
+    "body": "Tapping a county no longer stacks a vague “news vibe” card on top of labor stats. The panel shows unemployment with statewide rank, income, and jobs. Lowest-unemployment peers use a padded dot-plot axis so 2.5% vs 2.8% is visually distinct."
+  },
+  {
+    "title": "Compact prompt carousel with a 26-character label cap",
+    "labels": ["feature", "ux"],
+    "body": "Starter prompts sit in a single-row auto-advancing carousel (swipe, chevrons, pause on hover). Every visible label is clamped to 26 characters so headlines never clip. News chips read `News · {place}`; the full prompt is still sent on tap."
+  },
+  {
+    "title": "Unit tests for map, jobs, news, and transit logic",
+    "labels": ["feature", "testing"],
+    "body": "Vitest covers county lookup, query→area sync, biz-journal relevance, unemployment rank copy, jobs error states, rate-limit messaging, transit agencies, and carousel label limits. Run with `npm test`."
+  }
+]
