@@ -69,9 +69,14 @@ export function fitWisconsinCamera(map: FitBoundsMap, duration = 0) {
 export type MapStyleId = "streets" | "satellite" | "terrain";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() || "";
+const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim() || "";
 
 export function hasMapboxToken() {
   return MAPBOX_TOKEN.length > 0;
+}
+
+export function hasCartoApiKey() {
+  return CARTO_API_KEY.length > 0;
 }
 
 /** Live satellite imagery available without Mapbox (Esri World Imagery). */
@@ -86,8 +91,9 @@ export function isSatelliteStyle(styleId: MapStyleId) {
 /** Preconnect targets for layout.tsx */
 export const MAP_TILE_ORIGINS = [
   "https://server.arcgisonline.com",
-  "https://a.basemaps.cartocdn.com",
-  "https://b.basemaps.cartocdn.com",
+  ...(CARTO_API_KEY
+    ? ["https://a.basemaps.cartocdn.com", "https://b.basemaps.cartocdn.com"]
+    : []),
   "https://tile.opentopomap.org",
   "https://tiles.openfreemap.org",
   "https://api.mapbox.com",
@@ -107,25 +113,102 @@ const ESRI_LABELS =
 const ESRI_TRANSPORT =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
 
+const ESRI_STREETS =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+
+const ESRI_DARK =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+
+const ESRI_LIGHT_GRAY =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+
+const OSM_ATTRIBUTION = "© OpenStreetMap contributors";
+const ESRI_ATTRIBUTION = `© Esri ${OSM_ATTRIBUTION}`;
+const CARTO_ATTRIBUTION = `© CARTO ${OSM_ATTRIBUTION}`;
+
+export type RasterTileLayer = {
+  tiles: string[];
+  url: string;
+  attribution: string;
+  subdomains?: string;
+};
+
+function cartoKeySuffix(): string {
+  return CARTO_API_KEY ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : "";
+}
+
+/**
+ * Streets raster tiles that do not require a key.
+ * CARTO Voyager is used only when NEXT_PUBLIC_CARTO_API_KEY is set — without it,
+ * cartocdn watermarks every tile with "API KEY REQUIRED".
+ */
+export function streetRasterTiles(darkMode: boolean): RasterTileLayer {
+  if (hasCartoApiKey()) {
+    const scale = rasterTileScale();
+    const q = cartoKeySuffix();
+    const tiles = darkMode
+      ? [
+          `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+        ]
+      : [
+          `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+        ];
+    return {
+      tiles,
+      url: darkMode
+        ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png${q}`
+        : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png${q}`,
+      attribution: CARTO_ATTRIBUTION,
+      subdomains: "ab",
+    };
+  }
+
+  const url = darkMode ? ESRI_DARK : ESRI_STREETS;
+  return {
+    tiles: [url],
+    url,
+    attribution: ESRI_ATTRIBUTION,
+  };
+}
+
+function dataRasterTiles(darkMode: boolean): RasterTileLayer {
+  if (hasCartoApiKey()) {
+    const scale = rasterTileScale();
+    const q = cartoKeySuffix();
+    const tiles = darkMode
+      ? [
+          `https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+        ]
+      : [
+          `https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+        ];
+    return {
+      tiles,
+      url: tiles[0]!,
+      attribution: CARTO_ATTRIBUTION,
+      subdomains: "ab",
+    };
+  }
+
+  const url = darkMode ? ESRI_DARK : ESRI_LIGHT_GRAY;
+  return {
+    tiles: [url],
+    url,
+    attribution: ESRI_ATTRIBUTION,
+  };
+}
+
 function clampRaster(n: number, min = -1, max = 1) {
   return Math.min(max, Math.max(min, n));
 }
 
-function voyagerTileUrls(darkMode: boolean): string[] {
-  const scale = rasterTileScale();
-  return darkMode
-    ? [
-        `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png`,
-      ]
-    : [
-        `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
-      ];
-}
-
 /** Live satellite + colorful map wash + labels */
 export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
+  const wash = streetRasterTiles(darkMode);
   return {
     version: 8,
     name: "workways-satellite",
@@ -140,10 +223,10 @@ export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
       },
       colorWash: {
         type: "raster",
-        tiles: voyagerTileUrls(darkMode),
+        tiles: wash.tiles,
         tileSize: 256,
         maxzoom: 22,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: wash.attribution,
       },
       labels: {
         type: "raster",
@@ -196,9 +279,9 @@ export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
   };
 }
 
-/** Colorful CARTO Voyager — bold land use & water colors */
+/** Colorful streets raster — Esri World Topo, or CARTO Voyager when a key is set */
 export function getVoyagerMapStyle(darkMode: boolean): StyleSpecification {
-  const tiles = voyagerTileUrls(darkMode);
+  const layer = streetRasterTiles(darkMode);
 
   return {
     version: 8,
@@ -206,9 +289,9 @@ export function getVoyagerMapStyle(darkMode: boolean): StyleSpecification {
     sources: {
       basemap: {
         type: "raster",
-        tiles,
+        tiles: layer.tiles,
         tileSize: 256,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: layer.attribution,
       },
     },
     layers: [
@@ -259,16 +342,7 @@ export function getTerrainMapStyle(): StyleSpecification {
 
 /** Clean minimal basemap for secondary pages */
 export function getDataMapStyle(darkMode: boolean): StyleSpecification {
-  const scale = rasterTileScale();
-  const tiles = darkMode
-    ? [
-        `https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png`,
-      ]
-    : [
-        `https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png`,
-      ];
+  const layer = dataRasterTiles(darkMode);
 
   return {
     version: 8,
@@ -276,9 +350,9 @@ export function getDataMapStyle(darkMode: boolean): StyleSpecification {
     sources: {
       basemap: {
         type: "raster",
-        tiles,
+        tiles: layer.tiles,
         tileSize: 256,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: layer.attribution,
       },
     },
     layers: [{ id: "basemap", type: "raster", source: "basemap", minzoom: 0, maxzoom: 22 }],
@@ -347,7 +421,7 @@ export function getInitialMapStyle(
       return getTerrainMapStyle();
     case "streets":
     default:
-      // CARTO Voyager raster — vivid, reliable, reads instantly as a map
+      // Raster streets — Esri (or CARTO Voyager when a key is set)
       return getVoyagerMapStyle(false);
   }
 }
