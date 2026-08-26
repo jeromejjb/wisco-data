@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Map,
   Marker,
   NavigationControl,
+  MAP_WEBGL_ATTRIBUTES,
+  mapCanRender,
+  safeMapRemove,
   type GeoJSONSource,
   type MapLibreMap,
 } from "@/lib/maplibre";
@@ -13,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { mapFlyDurationMs } from "@/lib/motion";
+import { MapWebGLUnavailable } from "@/components/map/map-webgl-unavailable";
+import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
 import {
   getRasterBasemapStyle,
   getMapStyleUrl,
@@ -102,6 +107,7 @@ export function TransitMap({
   const skipStyleChangeRef = useRef(true);
   const darkMode = useAppStore((s) => s.darkMode);
   const reducedMotion = usePrefersReducedMotion();
+  const [webglProbe, setWebglProbe] = useState<WebGL2Probe | null>(null);
 
   const style = hasMapboxToken()
     ? getMapStyleUrl("streets", darkMode)
@@ -221,15 +227,45 @@ export function TransitMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = new Map({
-      container: containerRef.current,
-      style,
-      center: [center.lng, center.lat],
-      zoom,
-      maxBounds: WISCONSIN_BOUNDS,
-      minZoom: 8,
-      maxZoom: 16,
-      fadeDuration: 0,
+    const support = probeWebGL2();
+    if (!support.ok) {
+      setWebglProbe(support);
+      return;
+    }
+
+    let map: MapLibreMap;
+    try {
+      map = new Map({
+        container: containerRef.current,
+        style,
+        center: [center.lng, center.lat],
+        zoom,
+        maxBounds: WISCONSIN_BOUNDS,
+        minZoom: 8,
+        maxZoom: 16,
+        fadeDuration: 0,
+        canvasContextAttributes: { ...MAP_WEBGL_ATTRIBUTES },
+      });
+    } catch (err) {
+      setWebglProbe(
+        isGpuInitializationError(err) ? support : { ok: false, statusMessage: null }
+      );
+      return;
+    }
+
+    if (!mapCanRender(map)) {
+      setWebglProbe(support);
+      safeMapRemove(map);
+      return;
+    }
+
+    map.on("error", (e) => {
+      if (isGpuInitializationError(e.error)) {
+        setWebglProbe({
+          ok: false,
+          statusMessage: e.error instanceof Error ? e.error.message : null,
+        });
+      }
     });
 
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
@@ -251,7 +287,7 @@ export function TransitMap({
 
     return () => {
       vehicleMarkersRef.current.forEach((m) => m.remove());
-      map.remove();
+      safeMapRemove(map);
       mapRef.current = null;
       skipStyleChangeRef.current = true;
     };
@@ -297,6 +333,7 @@ export function TransitMap({
 
   return (
     <div className="relative h-full min-h-[280px] w-full">
+      {webglProbe ? <MapWebGLUnavailable probe={webglProbe} /> : null}
       <div
         ref={containerRef}
         className={cn(

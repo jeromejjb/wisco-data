@@ -1,18 +1,70 @@
 import type { StyleSpecification } from "maplibre-gl";
 
-/** Wisconsin bounding box — keeps the map focused on the state */
+/**
+ * Pan/zoom constraint. Must be looser than the state itself: a landscape
+ * viewport that shows Kenosha-to-Superior has to include longitude outside
+ * Wisconsin (Lake Michigan, a strip of Minnesota/Iowa). A tight bbox forces
+ * MapLibre to keep zoom high and crop the south and the lake.
+ */
 export const WISCONSIN_BOUNDS: [[number, number], [number, number]] = [
-  [-92.9, 42.4],
-  [-86.2, 47.15],
+  [-95.4, 41.15],
+  [-83.9, 48.35],
 ];
 
-export const WISCONSIN_CENTER = { lat: 44.5, lng: -89.5 };
-/** Population belt — slightly south of geographic center for a tighter default frame */
-export const WISCONSIN_IMMERSIVE_CENTER = { lat: 43.95, lng: -89.15 };
-export const WISCONSIN_DEFAULT_ZOOM = 7.2;
-/** Home map: close enough to read county labels and choropleth colors */
-export const WISCONSIN_IMMERSIVE_ZOOM = 7.95;
-export const WISCONSIN_IMMERSIVE_PITCH = 28;
+/** Frame for the home camera: full state plus a band of Lake Michigan. */
+export const WISCONSIN_FIT_BOUNDS: [[number, number], [number, number]] = [
+  [-93.05, 42.32],
+  [-85.85, 47.22],
+];
+
+export const WISCONSIN_CENTER = { lat: 44.62, lng: -88.95 };
+/** Same statewide frame as the home map (east-shifted so the lake is in view). */
+export const WISCONSIN_IMMERSIVE_CENTER = WISCONSIN_CENTER;
+export const WISCONSIN_DEFAULT_ZOOM = 6.35;
+export const WISCONSIN_IMMERSIVE_ZOOM = 6.35;
+export const WISCONSIN_IMMERSIVE_PITCH = 0;
+
+export function statewideCameraPadding(): {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+} {
+  let dock = 148;
+  if (typeof document !== "undefined") {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--dock-total").trim();
+    const parsed = Number.parseFloat(raw);
+    if (Number.isFinite(parsed) && parsed > 0) dock = parsed;
+  }
+  return {
+    top: 72,
+    right: 20,
+    bottom: Math.round(dock + 20),
+    left: 20,
+  };
+}
+
+type FitBoundsMap = {
+  fitBounds: (
+    bounds: [[number, number], [number, number]],
+    options?: {
+      padding?: { top: number; right: number; bottom: number; left: number };
+      duration?: number;
+      pitch?: number;
+      bearing?: number;
+    }
+  ) => unknown;
+};
+
+/** Frame Wisconsin + Lake Michigan in the visible map, clear of the ask dock. */
+export function fitWisconsinCamera(map: FitBoundsMap, duration = 0) {
+  map.fitBounds(WISCONSIN_FIT_BOUNDS, {
+    padding: statewideCameraPadding(),
+    duration,
+    pitch: 0,
+    bearing: 0,
+  });
+}
 
 export type MapStyleId = "streets" | "satellite" | "terrain";
 

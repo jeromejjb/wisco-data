@@ -22,6 +22,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - Ensure-PR job explains when GitHub Actions is blocked from opening pull requests, instead of dumping a Node stack trace.
+- Map no longer crashes with `painter is undefined` when Firefox blocks WebGL2; it explains how to turn WebGL back on.
+- Home map frames the full state plus Lake Michigan instead of cropping the south and sides.
 
 ### Changed
 

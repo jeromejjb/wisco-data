@@ -49,14 +49,15 @@ function WorkspaceInner() {
 
   useEffect(() => {
     if (areaLoading) return;
+    if (area.source === "default") return;
     if (lastAreaCountyRef.current === area.countyId) return;
     lastAreaCountyRef.current = area.countyId;
     applyActions([
       {
         type: "flyTo",
         center: { lat: area.lat, lng: area.lng },
-        zoom: area.source === "default" ? 7.95 : 8.35,
-        pitch: 30,
+        zoom: 8.35,
+        pitch: 18,
       },
     ]);
   }, [area.countyId, area.lat, area.lng, area.source, areaLoading, applyActions]);
