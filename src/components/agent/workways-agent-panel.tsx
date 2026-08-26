@@ -356,7 +356,7 @@ export function WorkwaysAgentPanel({
             <h2 className={cn("font-display font-bold", isOverlay ? "text-sm" : "text-base")}>
               Workways Agent
             </h2>
-            <p className="truncate text-[11px] text-muted-foreground">
+            <p className="text-[11px] leading-snug text-muted-foreground">
               {isLoading
                 ? "Updating map…"
                 : isOverlay

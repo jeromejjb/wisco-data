@@ -13,6 +13,8 @@ describe("isRateLimitError", () => {
     expect(isRateLimitError("HTTP 429 too many requests")).toBe(true);
     expect(isRateLimitError("Rate limit exceeded")).toBe(true);
     expect(isRateLimitError("quota exceeded")).toBe(true);
+    expect(isRateLimitError("RESOURCE_EXHAUSTED")).toBe(true);
+    expect(isRateLimitError("insufficient_quota")).toBe(true);
     expect(isRateLimitError("network timeout")).toBe(false);
   });
 });
@@ -35,9 +37,9 @@ describe("formatRetryWindow", () => {
 describe("agentRateLimitCopy", () => {
   it("includes timing guidance", () => {
     const copy = agentRateLimitCopy("429 Retry-After: 300");
-    expect(copy.title).toMatch(/paused briefly/i);
+    expect(copy.title).toMatch(/quick breath/i);
     expect(copy.detail).toMatch(/about 5 minutes/i);
-    expect(copy.detail).toMatch(/nothing is broken/i);
+    expect(copy.detail).toMatch(/recharge on their own/i);
   });
 });
 
@@ -53,8 +55,8 @@ describe("formatAgentError", () => {
   it("returns graceful rate-limit messaging", () => {
     const info = formatAgentError(new Error("429 rate limit exceeded"));
     expect(info.isRateLimited).toBe(true);
-    expect(info.title).toMatch(/paused briefly/i);
-    expect(info.detail).toMatch(/try again in about/i);
+    expect(info.title).toMatch(/quick breath/i);
+    expect(info.detail).toMatch(/back in about/i);
     expect(info.canUseLiveData).toBe(true);
   });
 });

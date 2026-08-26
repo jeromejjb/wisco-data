@@ -1,0 +1,2002 @@
+[
+  {
+    "slug": "transit-mock-routes-as-live",
+    "severity": "blocker",
+    "area": "transit",
+    "file": "src/services/live/transit.ts",
+    "title": "Transit trip cards are mock routes labeled as live GTFS",
+    "problem": "`getLiveTransitData` injects `generateRoutes()` from mock data and still marks provenance `confidence: high`. Origin is always the mock Milwaukee Holton St address. Hide trip cards until OTP/Mapbox is wired, or label them as sample schedules and drop mock imports from the live path."
+  },
+  {
+    "slug": "admin-secret-fail-open",
+    "severity": "blocker",
+    "area": "security",
+    "file": "src/app/api/prompt-experiments/route.ts",
+    "title": "Admin APIs are public when ADMIN_SECRET is unset",
+    "problem": "`isAuthorized` returns true if `ADMIN_SECRET` is missing. `/admin` pages have no middleware. Fail closed in production (401) and protect `/admin/*`."
+  },
+  {
+    "slug": "sources-post-unauthenticated",
+    "severity": "blocker",
+    "area": "security",
+    "file": "src/app/api/sources/route.ts",
+    "title": "Anyone can POST /api/sources and refresh every upstream feed",
+    "problem": "Public POST plus client auto-refresh after 8s (`use-source-sync`) can DoS BLS, QCEW×72, GTFS, and job APIs. Require admin/cron auth and a global refresh mutex."
+  },
+  {
+    "slug": "economy-ten-counties-not-72",
+    "severity": "blocker",
+    "area": "data",
+    "file": "src/lib/wi-counties.ts",
+    "title": "Live economy still built from 10 featured counties, not 72",
+    "problem": "`WI_COUNTIES` and `getLiveEconomyData` only cover 10 metros. Explore cards, QCEW fetches, and county-panel extra tiles miss the rest of Wisconsin. Iterate all FIPS in `WI_COUNTY_NAME_TO_FIPS`."
+  },
+  {
+    "slug": "budgets-insights-unlabeled-mock",
+    "severity": "blocker",
+    "area": "data",
+    "file": "src/app/budgets/page.tsx",
+    "title": "Budgets and Insights pages serve unlabeled mock data",
+    "problem": "Both pages read adapters backed by `src/data/mock` with HTTP 200 APIs and no sample-data banner. Add a prominent mock banner or replace with live sources. Download/Share on Insights are dead buttons."
+  },
+  {
+    "slug": "milwaukee-silent-defaults",
+    "severity": "high",
+    "area": "map",
+    "file": "src/lib/user-area.ts",
+    "title": "Unknown location still silently becomes Milwaukee",
+    "problem": "`/api/location`, `/api/news`, job geocodes, saved-place coords, and invalid county ids fall back to Milwaukee. Return `resolved: false` / null coords instead of pretending the user is in Milwaukee."
+  },
+  {
+    "slug": "transit-seven-agencies-runtime-two",
+    "severity": "high",
+    "area": "transit",
+    "file": "src/services/live/transit.ts",
+    "title": "Registry lists 7 agencies; live fetch defaults to MCTS + Madison",
+    "problem": "`agency=all` and agent `getTransitSnapshot` still load Milwaukee/Madison only. Map transit panel maps `all` → `mcts`. Green Bay GTFS URL looks like an HTML DocumentCenter page, not a zip. Fetch all registry agencies (or bbox-filter) and validate zip responses."
+  },
+  {
+    "slug": "commute-enrichment-two-metros",
+    "severity": "high",
+    "area": "jobs",
+    "file": "src/services/live/commute-enrichment.ts",
+    "title": "Job commute estimates only use MCTS and Madison stops",
+    "problem": "Statewide jobs get bogus transit flags. `transitAccessible` is hardcoded true for Milwaukee/Madison city names. Select agency via `agencyByCounty` and default transitAccessible to false until enrichment runs."
+  },
+  {
+    "slug": "jobs-error-responses-cached",
+    "severity": "high",
+    "area": "jobs",
+    "file": "src/services/clients/jobs-api.ts",
+    "title": "USAJobs/Adzuna errors are cached for 30 minutes",
+    "problem": "401/429/network failures stick in the in-memory cache. Only cache successful payloads; use a short TTL for errors."
+  },
+  {
+    "slug": "economy-fabricated-fields",
+    "severity": "high",
+    "area": "data",
+    "file": "src/services/live/economy.ts",
+    "title": "County cost of living, population change, and transit coverage are hardcoded",
+    "problem": "`costOfLivingIndex: 95`, `populationChange: 0.5`, and transit coverage constants are presented as live. Missing WisConomy rows become 3.5% unemployment. Omit or mark estimated; never invent rates."
+  },
+  {
+    "slug": "economy-single-source-fails-all",
+    "severity": "high",
+    "area": "data",
+    "file": "src/services/live/economy.ts",
+    "title": "One BLS/WisConomy failure 502s the whole economy payload",
+    "problem": "Use `Promise.allSettled` and return partial counties with source error flags. WisConomy XLS layout changes currently take down unemployment statewide."
+  },
+  {
+    "slug": "agent-no-rate-limit",
+    "severity": "high",
+    "area": "agent",
+    "file": "src/app/api/agent/route.ts",
+    "title": "Agent POST is unauthenticated and unbounded",
+    "problem": "Anyone can stream LLM + tool calls. Malformed JSON 500s. Add IP rate limits, 400 on bad JSON, and debounce `refreshStaleSources`."
+  },
+  {
+    "slug": "prisma-dead-persistence",
+    "severity": "high",
+    "area": "dx",
+    "file": "src/lib/prisma.ts",
+    "title": "Prisma SavedJob/SavedPlace models are unused; saved places stay in localStorage",
+    "problem": "Schema and postinstall generate imply a database that is never queried. Wire saved places or remove Prisma until needed. Experiments are in-memory and reset on deploy."
+  },
+  {
+    "slug": "cache-unbounded",
+    "severity": "high",
+    "area": "data",
+    "file": "src/lib/cache.ts",
+    "title": "In-memory cache has no LRU cap; GTFS bbox keys grow forever",
+    "problem": "Add max entries and sweep expired keys. Normalize GTFS bbox to a grid so panning does not explode keys."
+  },
+  {
+    "slug": "saved-places-hardcoded-milwaukee",
+    "severity": "high",
+    "area": "map",
+    "file": "src/app/saved/page.tsx",
+    "title": "Saved places always store Milwaukee downtown coordinates",
+    "problem": "Address text is ignored. `/transit?job=` from saved jobs is unread on the transit page. Geocode addresses and handle the job query param (or link to /jobs)."
+  },
+  {
+    "slug": "map-home-ignores-dark-mode",
+    "severity": "high",
+    "area": "ux",
+    "file": "src/components/map/agent-map.tsx",
+    "title": "Map home forces a light basemap and light-only dock chrome",
+    "problem": "`forceLightBasemap` plus hardcoded `bg-white` on MapChatWidget/logo/carousel. No theme toggle on `/` because Header is hidden. Respect darkMode or document always-light map as intentional."
+  },
+  {
+    "slug": "dead-agent-panel-and-chrome",
+    "severity": "high",
+    "area": "dx",
+    "file": "src/components/agent/workways-agent-panel.tsx",
+    "title": "WorkwaysAgentPanel and WorkspaceChrome are unused duplicates",
+    "problem": "490-line chat panel and workspace chrome never import. AgentShell `isOpen` is unused. Delete or wire a single agent surface."
+  },
+  {
+    "slug": "explore-layer-toggles-cosmetic",
+    "severity": "high",
+    "area": "map",
+    "file": "src/app/explore/page.tsx",
+    "title": "Explore layer toggles only recolor 10 dots, not a choropleth",
+    "problem": "Copy says live county markers. Wire `/api/economy/map` choropleth or drop the misleading toggles. Default compare is Milwaukee vs Dane."
+  },
+  {
+    "slug": "draw-transit-straight-line",
+    "severity": "high",
+    "area": "agent",
+    "file": "src/lib/agent/workways-agent.ts",
+    "title": "Agent drawTransitRoute draws a straight line, not a GTFS path",
+    "problem": "System prompt still says transit is MCTS/Madison only. Update tools + prompt for all registered agencies, or label the line as an approximate corridor."
+  },
+  {
+    "slug": "src-app-transit-page-tsx-medium",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/app/transit/page.tsx",
+    "title": "Trip planner shows mock RouteCards while copy says router coming soon",
+    "problem": "UI admits router is unwired but still renders full trip cards from generateRoutes mock data."
+  },
+  {
+    "slug": "src-components-agent-map-transit-panel-tsx-medium",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/components/agent/map-transit-panel.tsx",
+    "title": "Desktop transit sheet hides service alerts",
+    "problem": "Desktop TransitDetailSheet receives alerts={[]} while mobile gets real alerts."
+  },
+  {
+    "slug": "src-components-jobs-job-card-tsx-medium",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/components/jobs/job-card.tsx",
+    "title": "Job cards always say commute is by transit",
+    "problem": "Copy ignores commute.mode when enrichment used a drive estimate."
+  },
+  {
+    "slug": "src-app-jobs-page-tsx-medium",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/app/jobs/page.tsx",
+    "title": "Jobs page has no location filter",
+    "problem": "Keyword/industry/commute only; cannot search outside implicit API defaults. Mobile sheet missing safe-area."
+  },
+  {
+    "slug": "src-app-api-news-route-ts-medium",
+    "severity": "medium",
+    "area": "news",
+    "file": "src/app/api/news/route.ts",
+    "title": "News API defaults to Milwaukee",
+    "problem": "Missing county/lat/lng silently uses DEFAULT_USER_AREA."
+  },
+  {
+    "slug": "src-lib-agent-chat-starters-ts-medium",
+    "severity": "medium",
+    "area": "agent",
+    "file": "src/lib/agent/chat-starters.ts",
+    "title": "Default chat starters are Milwaukee/Madison",
+    "problem": "Fallback chips mention Milwaukee jobs and fly to Madison when location prompts are off."
+  },
+  {
+    "slug": "src-components-agent-area-picker-tsx-medium",
+    "severity": "medium",
+    "area": "map",
+    "file": "src/components/agent/area-picker.tsx",
+    "title": "Area picker only lists 10 featured counties",
+    "problem": "Manual picker should use all 72 counties with search."
+  },
+  {
+    "slug": "src-components-data-source-panel-tsx-medium",
+    "severity": "medium",
+    "area": "copy",
+    "file": "src/components/data/source-panel.tsx",
+    "title": "Source panel hardcodes two GTFS agencies",
+    "problem": "Does not generate chips from TRANSIT_AGENCY_LIST."
+  },
+  {
+    "slug": "src-lib-site-meta-ts-medium",
+    "severity": "medium",
+    "area": "copy",
+    "file": "src/lib/site-meta.ts",
+    "title": "Site meta claims Prisma stores experiments",
+    "problem": "Experiments are in-memory; Prisma is unused."
+  },
+  {
+    "slug": "src-app-privacy-page-tsx-medium",
+    "severity": "medium",
+    "area": "copy",
+    "file": "src/app/privacy/page.tsx",
+    "title": "Privacy copy says OpenFreeMap is the default basemap",
+    "problem": "Maps default to CARTO/Esri rasters unless Mapbox token is set."
+  },
+  {
+    "slug": "src-hooks-use-user-area-ts-medium",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/hooks/use-user-area.ts",
+    "title": "Client may send IP to ipapi.co",
+    "problem": "Third-party IP geolocation without going through first-party /api/location."
+  },
+  {
+    "slug": "src-components-admin-experiments-dashboard-tsx-medium",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/components/admin/experiments-dashboard.tsx",
+    "title": "Admin secret in query string",
+    "problem": "?key= leaks via history, logs, and Referer."
+  },
+  {
+    "slug": "src-lib-data-sources-registry-ts-medium",
+    "severity": "medium",
+    "area": "dx",
+    "file": "src/lib/data-sources/registry.ts",
+    "title": "GTFS cache key mismatch in registry",
+    "problem": "Registry lists gtfs:agencies but code uses gtfs:agencies:v2."
+  },
+  {
+    "slug": "-env-example-medium",
+    "severity": "medium",
+    "area": "dx",
+    "file": ".env.example",
+    "title": "Dead transit API keys in env example",
+    "problem": "MCTS_BUSTIME_KEY and MADISON_METRO_API_KEY are never read."
+  },
+  {
+    "slug": "src-lib-agent-local-map-answer-ts-medium",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/local-map-answer.ts",
+    "title": "No tests for local-map-answer",
+    "problem": "Complex live-fallback branching is untested."
+  },
+  {
+    "slug": "src-services-clients-gtfs-ts-medium",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/gtfs.ts",
+    "title": "No tests for GTFS client",
+    "problem": "Download/parse/RT error paths have no fixtures."
+  },
+  {
+    "slug": "src-components-layout-header-tsx-medium",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/components/layout/header.tsx",
+    "title": "Two unrelated chrome systems",
+    "problem": "Route Header vs map WorkspaceLogo; desktop nav hidden until xl."
+  },
+  {
+    "slug": "src-components-ui-button-tsx-medium",
+    "severity": "medium",
+    "area": "a11y",
+    "file": "src/components/ui/button.tsx",
+    "title": "Button does not default type=button",
+    "problem": "Inside forms, buttons submit accidentally."
+  },
+  {
+    "slug": "src-app-explore-page-tsx-medium",
+    "severity": "medium",
+    "area": "a11y",
+    "file": "src/app/explore/page.tsx",
+    "title": "Explore compare selects unlabeled",
+    "problem": "No htmlFor/aria-label on county comparison dropdowns."
+  },
+  {
+    "slug": "src-lib-transit-agencies-ts-medium",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/lib/transit-agencies.ts",
+    "title": "Green Bay GTFS URL may not be a zip",
+    "problem": "DocumentCenter HTML URL fails silently in AdmZip."
+  },
+  {
+    "slug": "src-lib-agent-system-prompt-ts-medium",
+    "severity": "medium",
+    "area": "agent",
+    "file": "src/lib/agent/system-prompt.ts",
+    "title": "System prompt still says two transit agencies",
+    "problem": "Contradicts seven-agency registry; tells agent to fly to Milwaukee or Madison."
+  },
+  {
+    "slug": "src-services-live-economy-ts-medium",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/services/live/economy.ts",
+    "title": "Open jobs estimated as 2.8% of QCEW",
+    "problem": "Presented beside live unemployment without Est. labeling."
+  },
+  {
+    "slug": "src-lib-user-area-ts-medium",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/lib/user-area.ts",
+    "title": "user-area imports mock metroRegions",
+    "problem": "Live geolocation depends on mock economy metadata."
+  },
+  {
+    "slug": "src-app-insights-page-tsx-medium",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/app/insights/page.tsx",
+    "title": "Insights Download and Share do nothing",
+    "problem": "Dead buttons on a public page."
+  },
+  {
+    "slug": "src-app-saved-page-tsx-medium",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/app/saved/page.tsx",
+    "title": "Saved jobs vanish when not in current feed",
+    "problem": "missingSavedIds tracked but not shown as stale."
+  },
+  {
+    "slug": "src-lib-loading-messages-ts-low",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/lib/loading-messages.ts",
+    "title": "Loading copy always names Madison and Milwaukee",
+    "problem": "Not area-aware."
+  },
+  {
+    "slug": "src-components-map-map-basemap-switcher-tsx-low",
+    "severity": "low",
+    "area": "a11y",
+    "file": "src/components/map/map-basemap-switcher.tsx",
+    "title": "Basemap toggles lack aria-pressed",
+    "problem": "Title-only, no aria-label."
+  },
+  {
+    "slug": "src-app-explore-page-tsx-low",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/explore/page.tsx",
+    "title": "Explore claims live county markers",
+    "problem": "Only 10 colored dots, not a live statewide layer."
+  },
+  {
+    "slug": "src-data-mock-jobs-ts-low",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/data/mock/jobs.ts",
+    "title": "497-line mock jobs file is unused",
+    "problem": "Dead weight; risk of accidental reintroduction."
+  },
+  {
+    "slug": "src-components-layout-site-footer-tsx-low",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/components/layout/site-footer.tsx",
+    "title": "Minimal footer variant is dead code",
+    "problem": "ConditionalFooter skips / so RouteFooter minimal never renders."
+  },
+  {
+    "slug": "untested-app-about-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/about/page.tsx",
+    "title": "No unit tests for src/app/about/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-admin-experiments-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/admin/experiments/page.tsx",
+    "title": "No unit tests for src/app/admin/experiments/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-admin-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/admin/page.tsx",
+    "title": "No unit tests for src/app/admin/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-agent-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/agent/route.ts",
+    "title": "No unit tests for src/app/api/agent/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-budgets-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/budgets/route.ts",
+    "title": "No unit tests for src/app/api/budgets/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-economy-map-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/economy/map/route.ts",
+    "title": "No unit tests for src/app/api/economy/map/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-economy-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/economy/route.ts",
+    "title": "No unit tests for src/app/api/economy/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-insights-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/insights/route.ts",
+    "title": "No unit tests for src/app/api/insights/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-jobs-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/jobs/route.ts",
+    "title": "No unit tests for src/app/api/jobs/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-location-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/location/route.ts",
+    "title": "No unit tests for src/app/api/location/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-news-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/news/route.ts",
+    "title": "No unit tests for src/app/api/news/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-prompt-experiments-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/prompt-experiments/route.ts",
+    "title": "No unit tests for src/app/api/prompt-experiments/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-sources-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/sources/route.ts",
+    "title": "No unit tests for src/app/api/sources/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-api-transit-route-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/app/api/transit/route.ts",
+    "title": "No unit tests for src/app/api/transit/route.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-budgets-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/budgets/page.tsx",
+    "title": "No unit tests for src/app/budgets/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-explore-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/explore/page.tsx",
+    "title": "No unit tests for src/app/explore/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-insights-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/insights/page.tsx",
+    "title": "No unit tests for src/app/insights/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-jobs-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/jobs/page.tsx",
+    "title": "No unit tests for src/app/jobs/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-layout-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/layout.tsx",
+    "title": "No unit tests for src/app/layout.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/page.tsx",
+    "title": "No unit tests for src/app/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-privacy-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/privacy/page.tsx",
+    "title": "No unit tests for src/app/privacy/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-saved-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/saved/page.tsx",
+    "title": "No unit tests for src/app/saved/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-terms-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/terms/page.tsx",
+    "title": "No unit tests for src/app/terms/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-app-transit-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/app/transit/page.tsx",
+    "title": "No unit tests for src/app/transit/page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-admin-experiments-dashboard-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/admin/experiments-dashboard.tsx",
+    "title": "No unit tests for src/components/admin/experiments-dashboard.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-agent-map-bridge-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/agent-map-bridge.tsx",
+    "title": "No unit tests for src/components/agent/agent-map-bridge.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-agent-shell-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/agent-shell.tsx",
+    "title": "No unit tests for src/components/agent/agent-shell.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-answer-panel-chrome-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/answer-panel-chrome.tsx",
+    "title": "No unit tests for src/components/agent/answer-panel-chrome.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-area-picker-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/area-picker.tsx",
+    "title": "No unit tests for src/components/agent/area-picker.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-commute-health-badge-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/commute-health-badge.tsx",
+    "title": "No unit tests for src/components/agent/commute-health-badge.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-local-prompt-bar-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/local-prompt-bar.tsx",
+    "title": "No unit tests for src/components/agent/local-prompt-bar.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-answer-stack-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-answer-stack.tsx",
+    "title": "No unit tests for src/components/agent/map-answer-stack.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-area-sentiment-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-area-sentiment.tsx",
+    "title": "No unit tests for src/components/agent/map-area-sentiment.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-biz-journal-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-biz-journal-panel.tsx",
+    "title": "No unit tests for src/components/agent/map-biz-journal-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-chat-widget-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-chat-widget.tsx",
+    "title": "No unit tests for src/components/agent/map-chat-widget.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-county-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-county-panel.tsx",
+    "title": "No unit tests for src/components/agent/map-county-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-granular-insight-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-granular-insight.tsx",
+    "title": "No unit tests for src/components/agent/map-granular-insight.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-insight-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-insight-panel.tsx",
+    "title": "No unit tests for src/components/agent/map-insight-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-job-results-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-job-results-panel.tsx",
+    "title": "No unit tests for src/components/agent/map-job-results-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-local-news-bridge-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-local-news-bridge.tsx",
+    "title": "No unit tests for src/components/agent/map-local-news-bridge.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-session-provider-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-session-provider.tsx",
+    "title": "No unit tests for src/components/agent/map-session-provider.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-map-transit-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/map-transit-panel.tsx",
+    "title": "No unit tests for src/components/agent/map-transit-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-prompt-carousel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/prompt-carousel.tsx",
+    "title": "No unit tests for src/components/agent/prompt-carousel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-use-local-map-answer-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/use-local-map-answer.ts",
+    "title": "No unit tests for src/components/agent/use-local-map-answer.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-agent-workways-agent-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/agent/workways-agent-panel.tsx",
+    "title": "No unit tests for src/components/agent/workways-agent-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-charts-economy-charts-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/charts/economy-charts.tsx",
+    "title": "No unit tests for src/components/charts/economy-charts.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-data-source-panel-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/data/source-panel.tsx",
+    "title": "No unit tests for src/components/data/source-panel.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-jobs-job-card-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/jobs/job-card.tsx",
+    "title": "No unit tests for src/components/jobs/job-card.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-jobs-jobs-setup-banner-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/jobs/jobs-setup-banner.tsx",
+    "title": "No unit tests for src/components/jobs/jobs-setup-banner.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-jobs-jobs-status-banner-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/jobs/jobs-status-banner.tsx",
+    "title": "No unit tests for src/components/jobs/jobs-status-banner.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-conditional-footer-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/conditional-footer.tsx",
+    "title": "No unit tests for src/components/layout/conditional-footer.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-conditional-header-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/conditional-header.tsx",
+    "title": "No unit tests for src/components/layout/conditional-header.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-data-source-links-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/data-source-links.tsx",
+    "title": "No unit tests for src/components/layout/data-source-links.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-global-search-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/global-search.tsx",
+    "title": "No unit tests for src/components/layout/global-search.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-header-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/header.tsx",
+    "title": "No unit tests for src/components/layout/header.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-legal-page-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/legal-page.tsx",
+    "title": "No unit tests for src/components/layout/legal-page.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-site-footer-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/site-footer.tsx",
+    "title": "No unit tests for src/components/layout/site-footer.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-layout-theme-provider-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/layout/theme-provider.tsx",
+    "title": "No unit tests for src/components/layout/theme-provider.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-agent-map-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/agent-map.tsx",
+    "title": "No unit tests for src/components/map/agent-map.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-map-basemap-switcher-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/map-basemap-switcher.tsx",
+    "title": "No unit tests for src/components/map/map-basemap-switcher.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-map-fallback-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/map-fallback.tsx",
+    "title": "No unit tests for src/components/map/map-fallback.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-map-hud-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/map-hud.tsx",
+    "title": "No unit tests for src/components/map/map-hud.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-map-legend-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/map-legend.tsx",
+    "title": "No unit tests for src/components/map/map-legend.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-map-story-banner-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/map-story-banner.tsx",
+    "title": "No unit tests for src/components/map/map-story-banner.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-real-map-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/real-map.tsx",
+    "title": "No unit tests for src/components/map/real-map.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-map-workways-map-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/map/workways-map.tsx",
+    "title": "No unit tests for src/components/map/workways-map.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-transit-route-card-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/transit/route-card.tsx",
+    "title": "No unit tests for src/components/transit/route-card.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-transit-transit-detail-sheet-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/transit/transit-detail-sheet.tsx",
+    "title": "No unit tests for src/components/transit/transit-detail-sheet.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-transit-transit-map-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/transit/transit-map.tsx",
+    "title": "No unit tests for src/components/transit/transit-map.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-workspace-workspace-chrome-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/workspace/workspace-chrome.tsx",
+    "title": "No unit tests for src/components/workspace/workspace-chrome.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-workspace-workspace-logo-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/workspace/workspace-logo.tsx",
+    "title": "No unit tests for src/components/workspace/workspace-logo.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-components-workspace-workways-workspace-tsx",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/components/workspace/workways-workspace.tsx",
+    "title": "No unit tests for src/components/workspace/workways-workspace.tsx",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-data-wi-county-centroids-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/data/wi-county-centroids.ts",
+    "title": "No unit tests for src/data/wi-county-centroids.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-client-ready-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-client-ready.ts",
+    "title": "No unit tests for src/hooks/use-client-ready.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-live-data-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-live-data.ts",
+    "title": "No unit tests for src/hooks/use-live-data.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-local-prompts-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-local-prompts.ts",
+    "title": "No unit tests for src/hooks/use-local-prompts.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-prompt-history-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-prompt-history.ts",
+    "title": "No unit tests for src/hooks/use-prompt-history.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-rotating-message-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-rotating-message.ts",
+    "title": "No unit tests for src/hooks/use-rotating-message.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-source-sync-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-source-sync.ts",
+    "title": "No unit tests for src/hooks/use-source-sync.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-sync-query-area-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-sync-query-area.ts",
+    "title": "No unit tests for src/hooks/use-sync-query-area.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-transit-map-data-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-transit-map-data.ts",
+    "title": "No unit tests for src/hooks/use-transit-map-data.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-hooks-use-user-area-ts",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-user-area.ts",
+    "title": "No unit tests for src/hooks/use-user-area.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-chat-display-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/chat-display.ts",
+    "title": "No unit tests for src/lib/agent/chat-display.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-experiment-store-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/experiment-store.ts",
+    "title": "No unit tests for src/lib/agent/experiment-store.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-format-agent-error-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/format-agent-error.ts",
+    "title": "No unit tests for src/lib/agent/format-agent-error.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-local-map-answer-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/local-map-answer.ts",
+    "title": "No unit tests for src/lib/agent/local-map-answer.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-map-actions-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/map-actions.ts",
+    "title": "No unit tests for src/lib/agent/map-actions.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-map-query-intent-utils-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/map-query-intent-utils.ts",
+    "title": "No unit tests for src/lib/agent/map-query-intent-utils.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-prompt-experiments-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/prompt-experiments.ts",
+    "title": "No unit tests for src/lib/agent/prompt-experiments.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-agent-system-prompt-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/agent/system-prompt.ts",
+    "title": "No unit tests for src/lib/agent/system-prompt.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-cache-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/cache.ts",
+    "title": "No unit tests for src/lib/cache.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-commute-policy-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/commute-policy.ts",
+    "title": "No unit tests for src/lib/commute-policy.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-county-explorer-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/county-explorer.ts",
+    "title": "No unit tests for src/lib/county-explorer.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-county-hover-html-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/county-hover-html.ts",
+    "title": "No unit tests for src/lib/county-hover-html.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-data-sources-registry-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/data-sources/registry.ts",
+    "title": "No unit tests for src/lib/data-sources/registry.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-format-population-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/format-population.ts",
+    "title": "No unit tests for src/lib/format-population.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-jobs-env-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/jobs-env.ts",
+    "title": "No unit tests for src/lib/jobs-env.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-jobs-filter-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/jobs-filter.ts",
+    "title": "No unit tests for src/lib/jobs-filter.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-loading-messages-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/loading-messages.ts",
+    "title": "No unit tests for src/lib/loading-messages.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-map-store-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/map-store.ts",
+    "title": "No unit tests for src/lib/map-store.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-map-styles-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/map-styles.ts",
+    "title": "No unit tests for src/lib/map-styles.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-maplibre-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/maplibre.ts",
+    "title": "No unit tests for src/lib/maplibre.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-prisma-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/prisma.ts",
+    "title": "No unit tests for src/lib/prisma.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-site-meta-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/site-meta.ts",
+    "title": "No unit tests for src/lib/site-meta.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-store-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/store.ts",
+    "title": "No unit tests for src/lib/store.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-test-fixtures-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/test-fixtures.ts",
+    "title": "No unit tests for src/lib/test-fixtures.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-utils-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/utils.ts",
+    "title": "No unit tests for src/lib/utils.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-wi-counties-geojson-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/wi-counties-geojson.ts",
+    "title": "No unit tests for src/lib/wi-counties-geojson.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-wi-counties-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/wi-counties.ts",
+    "title": "No unit tests for src/lib/wi-counties.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-lib-wi-county-fips-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/wi-county-fips.ts",
+    "title": "No unit tests for src/lib/wi-county-fips.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-adapters-index-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/adapters/index.ts",
+    "title": "No unit tests for src/services/adapters/index.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-bls-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/bls.ts",
+    "title": "No unit tests for src/services/clients/bls.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-census-fred-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/census-fred.ts",
+    "title": "No unit tests for src/services/clients/census-fred.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-gnews-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/gnews.ts",
+    "title": "No unit tests for src/services/clients/gnews.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-gtfs-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/gtfs.ts",
+    "title": "No unit tests for src/services/clients/gtfs.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-local-news-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/local-news.ts",
+    "title": "No unit tests for src/services/clients/local-news.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-news-rss-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/news-rss.ts",
+    "title": "No unit tests for src/services/clients/news-rss.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-qcew-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/qcew.ts",
+    "title": "No unit tests for src/services/clients/qcew.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-rss-parse-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/rss-parse.ts",
+    "title": "No unit tests for src/services/clients/rss-parse.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-clients-wisconomy-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/wisconomy.ts",
+    "title": "No unit tests for src/services/clients/wisconomy.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-live-economy-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/economy.ts",
+    "title": "No unit tests for src/services/live/economy.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-live-jobs-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/jobs.ts",
+    "title": "No unit tests for src/services/live/jobs.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-live-news-sentiment-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/news-sentiment.ts",
+    "title": "No unit tests for src/services/live/news-sentiment.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-live-refresh-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/refresh.ts",
+    "title": "No unit tests for src/services/live/refresh.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "untested-services-live-transit-ts",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/transit.ts",
+    "title": "No unit tests for src/services/live/transit.ts",
+    "problem": "Module has no matching *.test.ts; regressions will only show up in production or manual QA."
+  },
+  {
+    "slug": "api-agent-malformed-json",
+    "severity": "medium",
+    "area": "agent",
+    "file": "src/app/api/agent/route.ts",
+    "title": "Agent POST req.json() has no try/catch",
+    "problem": "Malformed JSON becomes an unhandled 500."
+  },
+  {
+    "slug": "api-error-detail-leak-economy",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/app/api/economy/route.ts",
+    "title": "Economy 502 leaks String(error)",
+    "problem": "Internal messages exposed to clients."
+  },
+  {
+    "slug": "api-error-detail-leak-jobs",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/app/api/jobs/route.ts",
+    "title": "Jobs 503 leaks String(error)",
+    "problem": "Sanitize production error bodies."
+  },
+  {
+    "slug": "api-error-detail-leak-news",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/app/api/news/route.ts",
+    "title": "News 502 leaks String(error)",
+    "problem": "Sanitize production error bodies."
+  },
+  {
+    "slug": "api-error-detail-leak-transit",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/app/api/transit/route.ts",
+    "title": "Transit 502 leaks String(error)",
+    "problem": "Sanitize production error bodies."
+  },
+  {
+    "slug": "api-jobs-nan-params",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/app/api/jobs/route.ts",
+    "title": "Invalid maxCommute becomes NaN",
+    "problem": "Number() on junk query params is passed into filters."
+  },
+  {
+    "slug": "api-jobs-200-empty-as-no-openings",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/app/api/jobs/route.ts",
+    "title": "Both job sources down still returns HTTP 200",
+    "problem": "Empty jobs look like no openings, not source failure."
+  },
+  {
+    "slug": "api-budgets-unused-route",
+    "severity": "medium",
+    "area": "dx",
+    "file": "src/app/api/budgets/route.ts",
+    "title": "Budgets page bypasses /api/budgets",
+    "problem": "Page imports adapter directly; API is dead surface."
+  },
+  {
+    "slug": "api-insights-unused-route",
+    "severity": "medium",
+    "area": "dx",
+    "file": "src/app/api/insights/route.ts",
+    "title": "Insights page bypasses /api/insights",
+    "problem": "Page imports adapter directly; API is dead surface."
+  },
+  {
+    "slug": "api-transit-invalid-agency",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/app/api/transit/route.ts",
+    "title": "Unknown agency silently falls back to MCTS+Madison",
+    "problem": "Should 400 on unknown agency ids."
+  },
+  {
+    "slug": "gtfs-vehicle-id-random",
+    "severity": "low",
+    "area": "transit",
+    "file": "src/services/clients/gtfs.ts",
+    "title": "Vehicle IDs fall back to Math.random()",
+    "problem": "Markers flicker on refresh."
+  },
+  {
+    "slug": "gtfs-rt-empty-vs-error",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/services/clients/gtfs.ts",
+    "title": "RT decode errors return empty arrays",
+    "problem": "UI cannot tell 'no buses' from 'feed down'."
+  },
+  {
+    "slug": "gtfs-failed-agency-silent",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/services/clients/gtfs.ts",
+    "title": "Failed GTFS download only console.warns",
+    "problem": "Agency disappears from summaries with no client error."
+  },
+  {
+    "slug": "jobs-get-by-id-refetch-all",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/services/live/jobs.ts",
+    "title": "getLiveJobById refetches the entire corpus",
+    "problem": "Look up by source id instead."
+  },
+  {
+    "slug": "census-key-silent-degrade",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/services/clients/census-fred.ts",
+    "title": "Missing Census/FRED keys silently drop income/LFPR",
+    "problem": "UI still implies Census sourcing."
+  },
+  {
+    "slug": "fred-lfpr-hardcoded",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/services/live/economy.ts",
+    "title": "LFPR falls back to 66.8 without FRED key",
+    "problem": "Label fallback in provenance."
+  },
+  {
+    "slug": "qcew-72-parallel",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/services/clients/qcew.ts",
+    "title": "QCEW fetches 72 counties in parallel on cache miss",
+    "problem": "Risk of BLS rate limits; add concurrency cap."
+  },
+  {
+    "slug": "news-sentiment-unbounded-keys",
+    "severity": "medium",
+    "area": "news",
+    "file": "src/services/live/news-sentiment.ts",
+    "title": "Sentiment cache key embeds all headline ids",
+    "problem": "Unbounded unique keys; hash by county+day."
+  },
+  {
+    "slug": "cache-no-cross-instance",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/lib/cache.ts",
+    "title": "Module cache does not share across serverless instances",
+    "problem": "Invalidation is per-instance only."
+  },
+  {
+    "slug": "cache-economy-nested-ttl",
+    "severity": "low",
+    "area": "data",
+    "file": "src/services/live/economy.ts",
+    "title": "Outer economy TTL can hide fresher inner sources",
+    "problem": "Align TTLs or invalidate sub-keys."
+  },
+  {
+    "slug": "map-styles-openfreemap-unused",
+    "severity": "medium",
+    "area": "map",
+    "file": "src/lib/map-styles.ts",
+    "title": "OpenFreeMap URLs exist but default is CARTO raster",
+    "problem": "Align implementation with privacy/docs."
+  },
+  {
+    "slug": "mapbox-token-client",
+    "severity": "low",
+    "area": "security",
+    "file": "src/lib/map-styles.ts",
+    "title": "NEXT_PUBLIC_MAPBOX_TOKEN is client-visible",
+    "problem": "Document URL restrictions in Mapbox dashboard."
+  },
+  {
+    "slug": "no-middleware",
+    "severity": "medium",
+    "area": "security",
+    "file": "src/",
+    "title": "No middleware.ts for auth or API rate limits",
+    "problem": "Add Next middleware for /api and /admin."
+  },
+  {
+    "slug": "prompt-experiments-client-server-split",
+    "severity": "medium",
+    "area": "data",
+    "file": "src/lib/agent/prompt-experiments.ts",
+    "title": "Client localStorage vs server memory for experiments",
+    "problem": "Dashboard mixes incompatible stats."
+  },
+  {
+    "slug": "agent-shell-isopen-unused",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/components/agent/agent-shell.tsx",
+    "title": "AgentShell isOpen is never consumed",
+    "problem": "Remove or connect to a visible drawer."
+  },
+  {
+    "slug": "saved-commutes-unused",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/lib/store.ts",
+    "title": "savedCommutes persisted but never shown",
+    "problem": "Implement commute UI or drop the field."
+  },
+  {
+    "slug": "header-live-badge-always",
+    "severity": "medium",
+    "area": "copy",
+    "file": "src/components/layout/header.tsx",
+    "title": "Header Live badge shows on mock pages",
+    "problem": "Gate LiveBadge on route data health."
+  },
+  {
+    "slug": "theme-no-system-preference",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/lib/store.ts",
+    "title": "Dark mode ignores prefers-color-scheme",
+    "problem": "Read matchMedia on first visit."
+  },
+  {
+    "slug": "theme-flash-hydration",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/components/layout/theme-provider.tsx",
+    "title": "Persisted dark theme flashes light",
+    "problem": "Inline script before paint."
+  },
+  {
+    "slug": "reduced-motion-carousel",
+    "severity": "low",
+    "area": "a11y",
+    "file": "src/components/agent/prompt-carousel.tsx",
+    "title": "Carousel auto-advance ignores reduced motion",
+    "problem": "Disable drag/auto-advance when prefers-reduced-motion."
+  },
+  {
+    "slug": "reduced-motion-answer-stack",
+    "severity": "low",
+    "area": "a11y",
+    "file": "src/components/agent/map-answer-stack.tsx",
+    "title": "Answer stack spring has no reduced-motion path",
+    "problem": "Use useReducedMotion()."
+  },
+  {
+    "slug": "jobs-layout-4rem-header",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/app/jobs/page.tsx",
+    "title": "Jobs uses 100vh-4rem but mobile header is taller",
+    "problem": "Flex min-h-0 instead of viewport math."
+  },
+  {
+    "slug": "explore-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/explore/page.tsx",
+    "title": "Explore page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "jobs-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/jobs/page.tsx",
+    "title": "Jobs page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "transit-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/transit/page.tsx",
+    "title": "Transit page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "saved-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/saved/page.tsx",
+    "title": "Saved page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "budgets-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/budgets/page.tsx",
+    "title": "Budgets page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "insights-no-metadata",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/app/insights/page.tsx",
+    "title": "Insights page has no metadata export",
+    "problem": "Add title/description."
+  },
+  {
+    "slug": "brand-name-split",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/components/workspace/workspace-logo.tsx",
+    "title": "Header says Wisconsin Workways; map logo says Workways",
+    "problem": "Unify naming."
+  },
+  {
+    "slug": "footer-nav-mismatch",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/components/layout/site-footer.tsx",
+    "title": "Footer omits Saved and Budgets from Header nav",
+    "problem": "Align IA."
+  },
+  {
+    "slug": "admin-violet-off-palette",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/app/admin/page.tsx",
+    "title": "Admin uses violet accent outside lake/forest/navy",
+    "problem": "Use lake/navy."
+  },
+  {
+    "slug": "duplicate-map-impls",
+    "severity": "medium",
+    "area": "dx",
+    "file": "src/components/map/agent-map.tsx",
+    "title": "AgentMap, RealMap, TransitMap duplicate bounds/styles",
+    "problem": "Extract shared map shell."
+  },
+  {
+    "slug": "qcew-quarter-hardcoded",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/services/live/economy.ts",
+    "title": "qcewQuarter hardcoded 2024 Q4",
+    "problem": "Derive from fetch metadata."
+  },
+  {
+    "slug": "mock-transit-alert-stale-date",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/data/mock/transit.ts",
+    "title": "Mock alert references a fixed Aug detour",
+    "problem": "Keep mocks out of live paths."
+  },
+  {
+    "slug": "economy-adapter-dead",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/services/adapters/index.ts",
+    "title": "economyAdapter is unused mock export",
+    "problem": "Delete or namespace under /mock."
+  },
+  {
+    "slug": "use-local-prompts-swallow",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/hooks/use-local-prompts.ts",
+    "title": "Experiment POST failures swallowed",
+    "problem": "Log in dev; surface dashboard degraded state."
+  },
+  {
+    "slug": "map-transit-stops-200",
+    "severity": "medium",
+    "area": "transit",
+    "file": "src/components/agent/map-transit-panel.tsx",
+    "title": "Stops silently sliced to 200",
+    "problem": "Show showing 200 of N or bbox-filter."
+  },
+  {
+    "slug": "agent-transit-stops-25",
+    "severity": "medium",
+    "area": "agent",
+    "file": "src/lib/agent/workways-agent.ts",
+    "title": "Agent transit snapshot exposes 20–25 stops",
+    "problem": "Sample near viewport; report totals."
+  },
+  {
+    "slug": "news-sentiment-unlabeled-heuristic",
+    "severity": "medium",
+    "area": "news",
+    "file": "src/services/live/news-sentiment.ts",
+    "title": "Heuristic sentiment not disclosed in UI",
+    "problem": "Surface sentiment.source when not Gemini."
+  },
+  {
+    "slug": "agent-injects-vibe",
+    "severity": "medium",
+    "area": "agent",
+    "file": "src/app/api/agent/route.ts",
+    "title": "Agent context still injects news vibe strings",
+    "problem": "County panel dropped vibe cards; agent should pass headlines only."
+  },
+  {
+    "slug": "compare-left-milwaukee",
+    "severity": "low",
+    "area": "map",
+    "file": "src/app/explore/page.tsx",
+    "title": "Explore compare defaults Milwaukee vs Dane",
+    "problem": "Initialize from user area."
+  },
+  {
+    "slug": "job-filters-label-htmlfor",
+    "severity": "medium",
+    "area": "a11y",
+    "file": "src/components/jobs/job-card.tsx",
+    "title": "Keyword filter label missing htmlFor",
+    "problem": "Associate labels with input ids."
+  },
+  {
+    "slug": "insights-all-links-explore",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/app/insights/page.tsx",
+    "title": "Every insight card links to /explore",
+    "problem": "Need per-story destinations."
+  },
+  {
+    "slug": "transit-detail-sheet-duplicate",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/app/transit/page.tsx",
+    "title": "TransitDetailSheet rendered twice",
+    "problem": "Once for desktop, once mobile — duplicate instances."
+  },
+  {
+    "slug": "workspace-bg-fixed-light",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/components/workspace/workways-workspace.tsx",
+    "title": "Workspace background #e8eef4 ignores dark mode",
+    "problem": "Use bg-background."
+  },
+  {
+    "slug": "global-search-divergent",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/components/layout/global-search.tsx",
+    "title": "Header search UX diverges from map ask dock",
+    "problem": "Share LocalPromptBar patterns."
+  },
+  {
+    "slug": "jobs-suspense-plain",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/app/jobs/page.tsx",
+    "title": "Jobs Suspense fallback is unstyled text",
+    "problem": "Use DataGatheringLoader."
+  },
+  {
+    "slug": "statcard-custom-live-dot",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/components/charts/economy-charts.tsx",
+    "title": "StatCard uses custom live dot not LiveBadge",
+    "problem": "Reuse LiveBadge."
+  },
+  {
+    "slug": "commute-badge-jobs-page",
+    "severity": "medium",
+    "area": "jobs",
+    "file": "src/components/jobs/job-card.tsx",
+    "title": "CommuteHealthBadge missing on /jobs cards",
+    "problem": "Show when commute minutes exist."
+  },
+  {
+    "slug": "no-test-jobs-filter",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/jobs-filter.ts",
+    "title": "jobs-filter untested",
+    "problem": "Cover commute caps and rankByReach."
+  },
+  {
+    "slug": "no-test-commute-policy",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/lib/commute-policy.ts",
+    "title": "commute-policy untested",
+    "problem": "Lock 45-minute policy."
+  },
+  {
+    "slug": "no-test-cache",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/lib/cache.ts",
+    "title": "cache.ts untested",
+    "problem": "TTL, inflight dedupe, invalidation."
+  },
+  {
+    "slug": "no-test-format-agent-error",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/lib/agent/format-agent-error.ts",
+    "title": "format-agent-error barely tested",
+    "problem": "Coded failures + fallback note."
+  },
+  {
+    "slug": "no-test-local-news",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/clients/local-news.ts",
+    "title": "local-news merge untested",
+    "problem": "GNews/RSS/biz-journal dedupe order."
+  },
+  {
+    "slug": "no-test-refresh",
+    "severity": "medium",
+    "area": "testing",
+    "file": "src/services/live/refresh.ts",
+    "title": "live refresh untested",
+    "problem": "Stale detection and error aggregation."
+  },
+  {
+    "slug": "no-test-county-explorer",
+    "severity": "low",
+    "area": "testing",
+    "file": "src/lib/county-explorer.ts",
+    "title": "county-explorer untested",
+    "problem": "Population flags and choropleth fallbacks."
+  },
+  {
+    "slug": "env-gemini-alias",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/lib/agent/model.ts",
+    "title": "GEMINI_API_KEY undocumented in .env.example",
+    "problem": "Document alias or remove."
+  },
+  {
+    "slug": "env-ai-gateway",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/lib/agent/model.ts",
+    "title": "AI_GATEWAY_API_KEY undocumented",
+    "problem": "Add optional gateway key comment."
+  },
+  {
+    "slug": "site-contact-unverified",
+    "severity": "low",
+    "area": "copy",
+    "file": "src/lib/site-meta.ts",
+    "title": "hello@wiscoworkways.app unverified in repo",
+    "problem": "Confirm mailbox."
+  },
+  {
+    "slug": "legal-link-dark-hover",
+    "severity": "low",
+    "area": "ux",
+    "file": "src/components/layout/legal-page.tsx",
+    "title": "Legal footer hover missing dark variant",
+    "problem": "Add dark:hover:text-lake-400."
+  },
+  {
+    "slug": "header-mobile-active-dark",
+    "severity": "medium",
+    "area": "ux",
+    "file": "src/components/layout/header.tsx",
+    "title": "Mobile nav active state missing dark:text-lake-400",
+    "problem": "Mirror desktop classes."
+  },
+  {
+    "slug": "as-any-agent-map",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/components/map/agent-map.tsx",
+    "title": "as any in agent-map",
+    "problem": "Type the MapLibre instance properly."
+  },
+  {
+    "slug": "as-any-real-map",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/components/map/real-map.tsx",
+    "title": "as any in real-map",
+    "problem": "Type the MapLibre instance properly."
+  },
+  {
+    "slug": "as-any-transit-map",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/components/transit/transit-map.tsx",
+    "title": "as any in transit-map",
+    "problem": "Type the MapLibre instance properly."
+  },
+  {
+    "slug": "as-any-session",
+    "severity": "low",
+    "area": "dx",
+    "file": "src/components/agent/map-session-provider.tsx",
+    "title": "as any in map-session-provider",
+    "problem": "Tighten store types."
+  },
+  {
+    "slug": "feature-branch-empty-commit",
+    "severity": "low",
+    "area": "dx",
+    "file": "scripts/start-feature.mjs",
+    "title": "Feature-start PRs begin with an empty commit",
+    "problem": "Empty commits are required so GitHub can open a PR before first real work; document this for contributors."
+  }
+]

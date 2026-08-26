@@ -21,7 +21,6 @@ import { formatPopulation, formatIncome } from "@/lib/format-population";
 import { WI_COUNTIES } from "@/lib/wi-counties";
 import type { CountyEconomy } from "@/lib/types";
 import { AnswerCard } from "./answer-panel-chrome";
-import { useMapSession } from "./map-session-provider";
 
 const fetcher = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null));
 
@@ -39,7 +38,6 @@ export function MapCountyPanel({ className }: { className?: string }) {
   const mapDemographics = useMapStore((s) => s.mapDemographics);
   const choroplethMetric = useMapStore((s) => s.choroplethMetric);
   const choroplethValues = useMapStore((s) => s.choroplethValues);
-  const { showAnswerStack } = useMapSession();
 
   const isFeatured = selectedCounty
     ? WI_COUNTIES.some((c) => c.id === selectedCounty.countyId)
@@ -141,10 +139,11 @@ export function MapCountyPanel({ className }: { className?: string }) {
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
           className={cn(
             "pointer-events-none fixed z-30",
-            "inset-x-3 bottom-[var(--safe-bottom-dock)] max-h-[min(50dvh,520px)]",
+            // Anchored to the dock's live measured height (--dock-total, set by
+            // MapChatWidget's ResizeObserver) — never slides under the dock.
+            "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)] max-h-[min(50dvh,520px)]",
             "sm:inset-x-auto sm:bottom-auto sm:left-4 sm:top-[4.5rem] sm:max-h-[calc(100dvh-8rem)] lg:top-20",
             "w-auto sm:w-[min(340px,calc(100vw-2rem))]",
-            showAnswerStack && "max-sm:hidden",
             className
           )}
         >
@@ -269,7 +268,7 @@ function StatTile({
     <div className="rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2.5">
       <div className="flex items-center gap-1.5">
         <Icon className="h-3.5 w-3.5 shrink-0 text-cyan-300/60" />
-        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-white/45">
+        <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/45">
           {label}
         </p>
       </div>

@@ -16,6 +16,10 @@ import { matchCityInText, userAreaFromCountyId } from "@/lib/user-area";
 import type { MapQueryIntent } from "./map-query-intent";
 import { COMMUTE_POLICY, classifyCommute } from "@/lib/commute-policy";
 import type { AreaNewsItem, LocalNewsMapPin } from "@/lib/news-types";
+import { isBizStoryRelevantToArea } from "@/lib/biz-journals";
+
+/** Minimal area context needed for business-journal relevance filtering. */
+type BizAreaContext = { displayName: string; countyId: string };
 
 export type MapJobHit = {
   id: string;
@@ -66,7 +70,10 @@ function payLabel(job: {
   return `$${thousands}k/yr`;
 }
 
-export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<LocalMapAnswer | null> {
+export async function buildLocalMapAnswer(
+  intent: MapQueryIntent,
+  opts?: { area?: BizAreaContext }
+): Promise<LocalMapAnswer | null> {
   const actions: MapAction[] = [];
   let jobs: MapJobHit[] = [];
   let liveCount = 0;
@@ -79,7 +86,10 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
     intent.flyToCountyId ??
     (intent.searchJobs?.location
       ? matchCityInText(intent.searchJobs.location.toLowerCase())?.countyId
-      : undefined);
+      : undefined) ??
+    // Fall back to the session's resolved area so business-journal results
+    // always anchor to where the user actually is, not a server default.
+    opts?.area?.countyId;
 
   if (intent.bizJournalNews || intent.searchJobs) {
     try {
@@ -100,6 +110,23 @@ export async function buildLocalMapAnswer(intent: MapQueryIntent): Promise<Local
         if (bizStories.length) {
           const pinIds = new Set(bizStories.map((s) => s.id));
           bizMapPins = payload.mapPins.filter((p) => pinIds.has(p.id));
+        }
+
+        // Strict area gate: keep only stories that pertain to the area —
+        // drop anything naming another metro and any story the geolocator
+        // placed in a different county than the one being viewed.
+        const areaCtx: BizAreaContext | undefined =
+          opts?.area ?? (newsCountyId ? userAreaFromCountyId(newsCountyId) : undefined);
+        if (areaCtx && bizStories.length) {
+          const relevant = bizStories.filter((story) => {
+            const text = `${story.title} ${story.summary ?? ""}`;
+            if (!isBizStoryRelevantToArea(text, areaCtx)) return false;
+            if (story.countyId && story.countyId !== areaCtx.countyId) return false;
+            return true;
+          });
+          const pinIds = new Set(relevant.map((s) => s.id));
+          bizStories = relevant;
+          bizMapPins = bizMapPins.filter((p) => pinIds.has(p.id));
         }
       }
     } catch {

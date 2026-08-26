@@ -19,13 +19,22 @@ export type ChatStarter = {
   experiment?: ExperimentVariant;
 };
 
-export function starterDisplayText(starter: ChatStarter): string {
-  return starter.label ?? starter.text;
+/** Max visible characters in the prompt carousel pill (fits the dock without clipping). */
+export const CAROUSEL_LABEL_MAX = 26;
+
+export function fitCarouselLabel(text: string, max = CAROUSEL_LABEL_MAX): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= max) return cleaned;
+
+  const budget = max - 1;
+  const slice = cleaned.slice(0, budget);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cut = lastSpace >= 8 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
 }
 
-function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+export function starterDisplayText(starter: ChatStarter): string {
+  return fitCarouselLabel(starter.label ?? starter.text);
 }
 
 const JOBS_VARIANTS = ["jobs-v1", "jobs-v2"] as const;
@@ -41,7 +50,7 @@ function jobsPrompt(area: UserArea, variant: string): string {
 
 function jobsLabel(area: UserArea, variant: string): string {
   const place = area.displayName;
-  if (variant === "jobs-v2") return `Open jobs near ${place}`;
+  if (variant === "jobs-v2") return `Jobs near ${place}`;
   return `Jobs in ${place}`;
 }
 
@@ -105,7 +114,7 @@ export function buildAreaChatStarters(
     starters.push({
       id: `news-${top.id}`,
       text: newsPrompt(area, top),
-      label: truncateText(top.title, 52),
+      label: `News · ${area.displayName}`,
       kind: "news",
     });
   }
@@ -114,6 +123,7 @@ export function buildAreaChatStarters(
     starters.push({
       id: "statewide-choropleth",
       text: "Unemployment by county statewide",
+      label: "Statewide unemployment",
       kind: "economy",
     });
   }

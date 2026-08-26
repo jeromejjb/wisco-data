@@ -1,6 +1,12 @@
 import { createAgentUIStreamResponse, safeValidateUIMessages } from "ai";
 import { createWorkwaysAgent } from "@/lib/agent/workways-agent";
-import { hasAgentCredentials, resolveAgentModel } from "@/lib/agent/model";
+import {
+  failureCooldownFromRaw,
+  hasAgentCredentials,
+  markModelCooldown,
+  resolveAgentLanguageModel,
+  resolveAgentModelFallback,
+} from "@/lib/agent/model";
 import { encodeAgentFailure } from "@/lib/rate-limit-messages";
 import { refreshStaleSources } from "@/services/live/refresh";
 import type { UserArea } from "@/lib/user-area";
@@ -10,7 +16,7 @@ export const maxDuration = 60;
 
 /** Warm stale feeds before agent sessions */
 export async function GET() {
-  const { provider, modelId } = resolveAgentModel();
+  const { provider, modelId } = resolveAgentModelFallback();
   return Response.json({
     ok: hasAgentCredentials(),
     agent: { provider, modelId },
@@ -63,8 +69,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // Use a wrapped model that hops to a free Gemini/OpenAI model in this same
+  // request when the primary is out of credits — instead of waiting on retries.
+  const chosen = resolveAgentModelFallback();
   const agent = createWorkwaysAgent(
-    contextLines.length ? contextLines.join("\n") : undefined
+    contextLines.length ? contextLines.join("\n") : undefined,
+    resolveAgentLanguageModel()
   );
 
   const validated = await safeValidateUIMessages({ messages });
@@ -77,7 +87,11 @@ export async function POST(req: Request) {
     uiMessages: validated.data,
     onError: (error) => {
       const raw = error instanceof Error ? error.message : String(error);
-      console.error("Agent stream failed:", raw);
+      console.error(`Agent stream failed [${chosen.provider}/${chosen.modelId}]:`, raw);
+      // Cool the exhausted model down so the next request rotates to a free
+      // fallback instead of hitting the same wall.
+      const until = failureCooldownFromRaw(raw);
+      if (until !== null) markModelCooldown(chosen.modelId, until);
       return encodeAgentFailure(raw);
     },
   });

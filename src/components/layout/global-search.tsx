@@ -46,7 +46,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           placeholder={
             compact ? "Ask the agent…" : "Ask anything about Wisconsin jobs & economy…"
           }
-          className="flex h-11 w-full rounded-2xl border border-border/70 bg-card/90 py-2 pl-10 pr-11 text-sm backdrop-blur-sm placeholder:text-muted-foreground focus-visible:outline-none"
+          className="flex h-11 w-full rounded-2xl border border-border/70 bg-card/90 py-2 pl-10 pr-11 text-base backdrop-blur-sm placeholder:text-muted-foreground focus-visible:outline-none sm:text-sm"
           aria-label="Ask the Workways Agent"
         />
         <button

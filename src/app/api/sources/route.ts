@@ -5,12 +5,12 @@ import {
   refreshLiveSources,
   refreshStaleSources,
 } from "@/services/live/refresh";
-import { resolveAgentModel } from "@/lib/agent/model";
+import { resolveAgentModelFallback } from "@/lib/agent/model";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { provider, modelId } = resolveAgentModel();
+  const { provider, modelId } = resolveAgentModelFallback();
   return NextResponse.json({
     sources: getDataSourceStatuses(),
     agent: { provider, modelId },
