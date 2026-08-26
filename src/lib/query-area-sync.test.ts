@@ -66,6 +66,21 @@ describe("applyQueryAreaSync", () => {
     );
   });
 
+  it("flies to a county for news and metric prompts without opening the county sheet", () => {
+    expect(
+      applyQueryAreaSync(
+        `What's the local impact of this news in Milwaukee? "Plant expansion downtown"`
+      )
+    ).toBe(true);
+    expect(applyActions).toHaveBeenCalled();
+    expect(selectCounty).not.toHaveBeenCalled();
+
+    selectCounty.mockClear();
+    applyActions.mockClear();
+    expect(applyQueryAreaSync("unemployment in Door County")).toBe(true);
+    expect(selectCounty).not.toHaveBeenCalled();
+  });
+
   it("returns false for empty or unknown queries", () => {
     expect(applyQueryAreaSync("")).toBe(false);
     expect(applyQueryAreaSync("hello world")).toBe(false);

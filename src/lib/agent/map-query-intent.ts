@@ -16,6 +16,10 @@ export type MapQueryIntent = {
   };
   /** Pull Wisconsin business journal feeds (moves, expansions, job growth). */
   bizJournalNews?: boolean;
+  /** Local / carousel news: show the asked headline, not only biz-journal RSS. */
+  localNews?: boolean;
+  /** Headline quoted in the user prompt (carousel preprompt). */
+  quotedHeadline?: string;
   transitMetro?: "milwaukee" | "madison" | "both";
 };
 
@@ -90,6 +94,51 @@ function wantsBizJournalNews(text: string): boolean {
   );
 }
 
+export function quotedHeadlineFromQuery(text: string): string | undefined {
+  const match = text.match(/"([^"]{6,240})"/);
+  return match?.[1]?.trim();
+}
+
+export function wantsLocalNews(text: string): boolean {
+  return (
+    /\blocal impact\b/i.test(text) ||
+    /\bthis news\b/i.test(text) ||
+    /\blocal news\b/i.test(text)
+  );
+}
+
+export function isStatewideMetricAsk(text: string): boolean {
+  return /\bstatewide\b|\bwhole state\b|\bby county\b|\ball 72\b|\bacross (the )?state\b/i.test(
+    text
+  );
+}
+
+/** Anchor a metric ask to the user's area when the prompt itself has no place. */
+export function withUserAreaIntent(
+  intent: MapQueryIntent,
+  query: string,
+  area?: { countyId: string; source?: string } | null
+): MapQueryIntent {
+  if (intent.flyToCountyId || !intent.metric || intent.localNews || intent.bizJournalNews) {
+    return intent;
+  }
+  if (isStatewideMetricAsk(query)) return intent;
+  const countyId = area?.countyId;
+  if (
+    !countyId ||
+    area?.source === "default" ||
+    countyId === "statewide" ||
+    countyId === "wisconsin"
+  ) {
+    return intent;
+  }
+  return {
+    ...intent,
+    flyToCountyId: countyId,
+    highlightCountyIds: intent.highlightCountyIds ?? [countyId],
+  };
+}
+
 function wantsTransit(text: string): boolean {
   return /\b(bus|buses|transit|mcts|metro|commute|train|public transport)\b/i.test(text);
 }
@@ -112,8 +161,15 @@ export function inferMapQueryIntent(text: string): MapQueryIntent | null {
     intent.metric = "transit-coverage";
   }
 
-  const jobKeyword = extractJobKeyword(lower);
-  const jobSeeking = wantsJobSearch(lower, jobKeyword);
+  const quotedHeadline = quotedHeadlineFromQuery(text);
+  const localNews = wantsLocalNews(lower);
+  if (localNews) {
+    intent.localNews = true;
+    if (quotedHeadline) intent.quotedHeadline = quotedHeadline;
+  }
+
+  const jobKeyword = localNews ? undefined : extractJobKeyword(lower);
+  const jobSeeking = localNews ? false : wantsJobSearch(lower, jobKeyword);
 
   const cityMatch = matchCityInText(lower);
   const countyIds = countyIdsFromText(lower);
@@ -169,6 +225,7 @@ export function inferMapQueryIntent(text: string): MapQueryIntent | null {
     intent.highlightCountyIds?.length ||
     intent.searchJobs ||
     intent.bizJournalNews ||
+    intent.localNews ||
     intent.transitMetro;
 
   return hasSignal ? intent : null;

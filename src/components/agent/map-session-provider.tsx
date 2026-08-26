@@ -15,7 +15,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { WorkwaysAgentMessage } from "@/lib/agent/workways-agent";
 import type { ChatStarter } from "@/lib/agent/chat-starters";
-import type { AreaSentimentSnapshot, LocalNewsMapPin } from "@/lib/news-types";
+import type { AreaNewsItem, AreaSentimentSnapshot, LocalNewsMapPin } from "@/lib/news-types";
 import { formatAssistantChatText, getMessageText } from "@/lib/agent/chat-display";
 import { useLocalPrompts } from "@/hooks/use-local-prompts";
 import { useSyncQueryArea } from "@/hooks/use-sync-query-area";
@@ -172,7 +172,11 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   const question = latestUserQuestion(messages);
   const queryIntent = useMemo(() => inferMapQueryIntent(question), [question]);
   const displayAnswer =
-    (localMapAnswer && (queryIntent?.searchJobs || queryIntent?.bizJournalNews)
+    (localMapAnswer &&
+    (queryIntent?.searchJobs ||
+      queryIntent?.bizJournalNews ||
+      queryIntent?.localNews ||
+      queryIntent?.metric)
       ? localMapAnswer.headline
       : null) ||
     answer ||
@@ -270,6 +274,7 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
         onApplied={onMapPainted}
         area={area}
         newsEnabled={newsPromptsEnabled}
+        seedNews={newsItems}
       />
       {children}
     </MapSessionContext.Provider>
@@ -284,6 +289,7 @@ function LocalMapAnswerRunner({
   onApplied,
   area,
   newsEnabled,
+  seedNews,
 }: {
   messages: WorkwaysAgentMessage[];
   status: string;
@@ -291,7 +297,8 @@ function LocalMapAnswerRunner({
   onApplied?: () => void;
   area: ReturnType<typeof useLocalPrompts>["area"];
   newsEnabled: boolean;
+  seedNews?: AreaNewsItem[];
 }) {
-  useLocalMapAnswer(messages, status, error, onApplied, area, newsEnabled);
+  useLocalMapAnswer(messages, status, error, onApplied, area, newsEnabled, seedNews);
   return null;
 }

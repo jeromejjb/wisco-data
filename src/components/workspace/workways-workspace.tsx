@@ -16,6 +16,7 @@ import { MapCountyPanel } from "@/components/agent/map-county-panel";
 import { MapAreaSentiment } from "@/components/agent/map-area-sentiment";
 import { useMapStore } from "@/lib/map-store";
 import { preloadCountiesGeoJson } from "@/lib/wi-counties-geojson";
+import { preloadStateOutlineGeoJson } from "@/lib/wi-state-outline";
 
 const AgentMap = dynamic(
   () => import("@/components/map/agent-map").then((m) => m.AgentMap),
@@ -45,6 +46,7 @@ function WorkspaceInner() {
 
   useEffect(() => {
     preloadCountiesGeoJson();
+    preloadStateOutlineGeoJson();
   }, []);
 
   useEffect(() => {

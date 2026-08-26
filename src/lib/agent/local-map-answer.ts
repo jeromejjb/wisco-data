@@ -21,6 +21,61 @@ import { useMapStore } from "@/lib/map-store";
 /** Minimal area context needed for business-journal relevance filtering. */
 type BizAreaContext = { displayName: string; countyId: string };
 
+type BuildLocalMapAnswerOpts = {
+  area?: BizAreaContext;
+  seedNews?: AreaNewsItem[];
+};
+
+function normalizeHeadline(title: string): string {
+  return title.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+export function titlesOverlap(a: string, b: string): boolean {
+  const na = normalizeHeadline(a);
+  const nb = normalizeHeadline(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const short = na.length <= nb.length ? na : nb;
+  const long = na.length <= nb.length ? nb : na;
+  if (short.length < 8) return false;
+  return long.includes(short.slice(0, Math.min(48, short.length)));
+}
+
+/** Prefer the headline quoted in the prompt, then seeded carousel stories, then fetched feed. */
+export function resolvePromptNewsStories(opts: {
+  quotedHeadline?: string;
+  fetched: AreaNewsItem[];
+  seed?: AreaNewsItem[];
+  place?: string;
+}): AreaNewsItem[] {
+  const seen = new Set<string>();
+  const combined: AreaNewsItem[] = [];
+  for (const story of [...(opts.seed ?? []), ...opts.fetched]) {
+    const key = normalizeHeadline(story.title);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    combined.push(story);
+  }
+
+  const quoted = opts.quotedHeadline?.trim();
+  if (!quoted) return combined.slice(0, 6);
+
+  const match = combined.find((story) => titlesOverlap(story.title, quoted));
+  const featured: AreaNewsItem =
+    match ??
+    ({
+      id: "prompt-headline",
+      title: quoted,
+      summary: opts.place ? `Asked for local impact in ${opts.place}` : undefined,
+      source: "google-rss",
+      countyName: opts.place,
+    } satisfies AreaNewsItem);
+  const rest = combined.filter(
+    (story) => story.id !== featured.id && !titlesOverlap(story.title, featured.title)
+  );
+  return [featured, ...rest].slice(0, 6);
+}
+
 export type MapJobHit = {
   id: string;
   title: string;
@@ -73,7 +128,7 @@ function payLabel(job: {
 
 export async function buildLocalMapAnswer(
   intent: MapQueryIntent,
-  opts?: { area?: BizAreaContext }
+  opts?: BuildLocalMapAnswerOpts
 ): Promise<LocalMapAnswer | null> {
   const actions: MapAction[] = [];
   let jobs: MapJobHit[] = [];
@@ -91,7 +146,13 @@ export async function buildLocalMapAnswer(
     opts?.area?.countyId;
 
   const [newsLayer, jobsLayer, economyLayer] = await Promise.all([
-    intent.bizJournalNews ? loadNewsLayer(newsCountyId, opts?.area) : Promise.resolve(null),
+    intent.bizJournalNews || intent.localNews
+      ? loadNewsLayer(newsCountyId, opts?.area, {
+          bizOnly: Boolean(intent.bizJournalNews) && !intent.localNews,
+          quotedHeadline: intent.quotedHeadline,
+          seedStories: opts?.seedNews,
+        })
+      : Promise.resolve(null),
     intent.searchJobs ? loadJobsLayer(intent) : Promise.resolve(null),
     intent.metric ? loadEconomyLayer(intent) : Promise.resolve(null),
   ]);
@@ -146,7 +207,15 @@ export async function buildLocalMapAnswer(
     actions.push({ type: "flyTo", center, zoom: 10, pitch: 28 });
   }
 
-  if (!jobs.length && !intent.metric && actions.length === 0 && !bizStories.length) return null;
+  if (
+    !jobs.length &&
+    !intent.metric &&
+    actions.length === 0 &&
+    !bizStories.length &&
+    !intent.quotedHeadline
+  ) {
+    return null;
+  }
 
   const transitCount = jobs.filter((j) => j.transitAccessible).length;
   const healthyCount = jobs.filter(
@@ -187,9 +256,14 @@ export async function buildLocalMapAnswer(
   } else if (countyFocus) {
     headline = headlineForCountyMetric(countyFocus);
     subline = `${formatRankContext(countyFocus)} · ${formatStateAvgLabel(countyFocus)}`;
-  } else if (bizStories.length) {
-    headline = `Business & job growth near ${place}`;
-    subline = `${bizStories.length} stor${bizStories.length === 1 ? "y" : "ies"} from Wisconsin business journals`;
+  } else if (bizStories.length || intent.quotedHeadline) {
+    const featured = bizStories[0];
+    headline = featured?.title ?? intent.quotedHeadline ?? `Local news near ${place}`;
+    subline =
+      featured?.summary ??
+      (intent.localNews
+        ? `Local impact in ${place}`
+        : `${bizStories.length} stor${bizStories.length === 1 ? "y" : "ies"} from Wisconsin business journals`);
   } else if (intent.metric) {
     headline = `Mapped ${intent.metric.replace("-", " ")} across Wisconsin`;
   } else {
@@ -228,40 +302,70 @@ function seededUnemployment(): {
   return { values, labels: state.choroplethLabels };
 }
 
-async function loadNewsLayer(newsCountyId: string | undefined, area?: BizAreaContext) {
+async function loadNewsLayer(
+  newsCountyId: string | undefined,
+  area: BizAreaContext | undefined,
+  opts: { bizOnly: boolean; quotedHeadline?: string; seedStories?: AreaNewsItem[] }
+) {
   let bizStories: AreaNewsItem[] = [];
   let bizMapPins: LocalNewsMapPin[] = [];
   try {
-    const qs = new URLSearchParams({ limit: "6", development: "1" });
+    const qs = new URLSearchParams({ limit: "8", development: "1" });
     if (newsCountyId) qs.set("county", newsCountyId);
     const res = await fetch(`/api/news?${qs}`);
-    if (!res.ok) return { bizStories, bizMapPins };
-    const payload = (await res.json()) as {
-      data: AreaNewsItem[];
-      mapPins: LocalNewsMapPin[];
-      bizJournalItems?: AreaNewsItem[];
-    };
-    bizStories = payload.bizJournalItems?.length
-      ? payload.bizJournalItems
-      : payload.data.filter((i) => i.source === "biz-journal");
+    const payload = res.ok
+      ? ((await res.json()) as {
+          data: AreaNewsItem[];
+          mapPins: LocalNewsMapPin[];
+          bizJournalItems?: AreaNewsItem[];
+        })
+      : { data: [] as AreaNewsItem[], mapPins: [] as LocalNewsMapPin[] };
+
+    const fetched = opts.bizOnly
+      ? payload.bizJournalItems?.length
+        ? payload.bizJournalItems
+        : payload.data.filter((item) => item.source === "biz-journal")
+      : payload.data;
+
+    bizStories = resolvePromptNewsStories({
+      quotedHeadline: opts.quotedHeadline,
+      fetched,
+      seed: opts.seedStories,
+      place: area?.displayName,
+    });
+
     if (bizStories.length) {
       const pinIds = new Set(bizStories.map((s) => s.id));
       bizMapPins = payload.mapPins.filter((p) => pinIds.has(p.id));
     }
+
     const areaCtx = area ?? (newsCountyId ? userAreaFromCountyId(newsCountyId) : undefined);
-    if (areaCtx && bizStories.length) {
-      const relevant = bizStories.filter((story) => {
+    if (opts.bizOnly && areaCtx && bizStories.length) {
+      const featured = bizStories[0];
+      const relevant = bizStories.filter((story, index) => {
+        if (index === 0 && opts.quotedHeadline && titlesOverlap(story.title, opts.quotedHeadline)) {
+          return true;
+        }
         const text = `${story.title} ${story.summary ?? ""}`;
         if (!isBizStoryRelevantToArea(text, areaCtx)) return false;
         if (story.countyId && story.countyId !== areaCtx.countyId) return false;
         return true;
       });
-      const pinIds = new Set(relevant.map((s) => s.id));
-      bizStories = relevant;
-      bizMapPins = bizMapPins.filter((p) => pinIds.has(p.id));
+      if (relevant.length) {
+        const pinIds = new Set(relevant.map((s) => s.id));
+        bizStories = relevant;
+        bizMapPins = bizMapPins.filter((p) => pinIds.has(p.id));
+      } else if (featured) {
+        bizStories = [featured];
+      }
     }
   } catch {
-    /* non-fatal */
+    bizStories = resolvePromptNewsStories({
+      quotedHeadline: opts.quotedHeadline,
+      fetched: [],
+      seed: opts.seedStories,
+      place: area?.displayName,
+    });
   }
   return { bizStories, bizMapPins };
 }

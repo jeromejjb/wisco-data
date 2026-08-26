@@ -26,6 +26,7 @@ import { fipsFromCountyId, getCountyCoordinates, countyIdFromFips, countyDisplay
 import { userAreaFromCountyId } from "@/lib/user-area";
 import { buildCountyHoverHtml } from "@/lib/county-hover-html";
 import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
+import { addWisconsinOutlineLayers, getStateOutlineGeoJson } from "@/lib/wi-state-outline";
 import {
   MapLegend,
   buildChoroplethExpression,
@@ -362,7 +363,7 @@ export function AgentMap({
 
   const addCountyLayers = useCallback(
     async (map: MapLibreMap) => {
-      const geo = await getCountiesGeoJson();
+      const [geo, stateGeo] = await Promise.all([getCountiesGeoJson(), getStateOutlineGeoJson()]);
       const mapDark = forceLightBasemap ? false : darkMode;
       const beforeLabels = findDataLayerAnchor(map);
 
@@ -423,6 +424,12 @@ export function AgentMap({
           beforeLabels
         );
       }
+
+      addWisconsinOutlineLayers(map, stateGeo, {
+        beforeId: beforeLabels,
+        satellite: onSatellite,
+        dark: mapDark,
+      });
 
       if (!map.getLayer(COUNTIES_HIGHLIGHT)) {
         map.addLayer({

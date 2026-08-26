@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import type { WorkwaysAgentMessage } from "@/lib/agent/workways-agent";
 import { extractMapActionsFromOutput } from "@/lib/agent/map-actions";
 import { getMessageText } from "@/lib/agent/chat-display";
-import { inferMapQueryIntent } from "@/lib/agent/map-query-intent";
+import { inferMapQueryIntent, withUserAreaIntent } from "@/lib/agent/map-query-intent";
 import { buildLocalMapAnswer } from "@/lib/agent/local-map-answer";
+import type { AreaNewsItem } from "@/lib/news-types";
 import { applyQueryAreaSync } from "@/lib/query-area-sync";
 import { useMapStore } from "@/lib/map-store";
 
@@ -45,8 +46,9 @@ export function useLocalMapAnswer(
   status: string,
   error: Error | undefined,
   onApplied?: () => void,
-  area?: { displayName: string; countyId: string },
-  newsEnabled = false
+  area?: { displayName: string; countyId: string; source?: string },
+  newsEnabled = false,
+  seedNews?: AreaNewsItem[]
 ) {
   const applyActions = useMapStore((s) => s.applyActions);
   const setLocalMapAnswer = useMapStore((s) => s.setLocalMapAnswer);
@@ -69,10 +71,12 @@ export function useLocalMapAnswer(
     const turnKey = `${lastUser.id}:${messages.length}:${error?.message ?? "ok"}`;
     if (processedTurnRef.current === turnKey) return;
 
-    const intent = inferMapQueryIntent(getMessageText(lastUser));
-    if (!intent) return;
+    const query = getMessageText(lastUser);
+    const parsed = inferMapQueryIntent(query);
+    if (!parsed) return;
 
-    applyQueryAreaSync(getMessageText(lastUser));
+    const intent = withUserAreaIntent(parsed, query, area);
+    applyQueryAreaSync(query);
 
     const usedTools = assistantUsedMapTools(messages);
     const hasText = assistantHasText(messages);
@@ -82,13 +86,14 @@ export function useLocalMapAnswer(
       !usedTools ||
       Boolean(intent.searchJobs) ||
       Boolean(intent.bizJournalNews) ||
+      Boolean(intent.localNews) ||
       Boolean(intent.flyToCountyId) ||
       Boolean(intent.metric);
     if (!shouldRun) return;
 
     processedTurnRef.current = turnKey;
 
-    void buildLocalMapAnswer(intent, { area }).then((answer) => {
+    void buildLocalMapAnswer(intent, { area, seedNews }).then((answer) => {
       if (!answer) return;
       setLocalMapAnswer(answer);
       if (answer.mapActions.length) {
@@ -99,7 +104,7 @@ export function useLocalMapAnswer(
       }
       onAppliedRef.current?.();
     });
-  }, [messages, status, error, applyActions, setLocalMapAnswer, area, newsEnabled]);
+  }, [messages, status, error, applyActions, setLocalMapAnswer, area, newsEnabled, seedNews]);
 }
 
 /** @deprecated use useLocalMapAnswer */

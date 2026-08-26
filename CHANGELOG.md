@@ -16,6 +16,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Glowing Wisconsin outline on the map so the state reads as one shape against the lakes and neighbors.
 - Pushing to an `issue/{n}-…` branch with no open PR now opens one into `main` automatically.
 - Night-shift workflow (every 8 hours): files the next catalog improvement as a GitHub issue and, when `CURSOR_API_KEY` is set, starts a Cursor cloud agent that opens a PR for approval.
 
@@ -23,7 +24,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Ensure-PR job explains when GitHub Actions is blocked from opening pull requests, instead of dumping a Node stack trace.
 - Map no longer crashes with `painter is undefined` when Firefox blocks WebGL2; it explains how to turn WebGL back on.
-- Home map frames the full state plus Lake Michigan instead of cropping the south and sides.
+- Tapping a carousel prompt now shows the asked question and its data (news headline, county numbers) on phones, not only on the map.
 
 ### Changed
 

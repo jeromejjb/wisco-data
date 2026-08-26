@@ -24,6 +24,7 @@ import {
   WISCONSIN_CENTER,
 } from "@/lib/map-styles";
 import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
+import { addWisconsinOutlineLayers, getStateOutlineGeoJson } from "@/lib/wi-state-outline";
 import { buildChoroplethExpression, fipsValuesFromCountyIds } from "./map-legend";
 import { MapWebGLUnavailable } from "./map-webgl-unavailable";
 import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
@@ -96,7 +97,7 @@ export default function RealMap({
 
   const ensureCountyLayers = useCallback(
     async (map: MapLibreMap) => {
-      const geo = await getCountiesGeoJson();
+      const [geo, stateGeo] = await Promise.all([getCountiesGeoJson(), getStateOutlineGeoJson()]);
       if (!map.getSource(COUNTIES_SOURCE)) {
         map.addSource(COUNTIES_SOURCE, { type: "geojson", data: geo, promoteId: "fips" });
       }
@@ -121,6 +122,7 @@ export default function RealMap({
           },
         });
       }
+      addWisconsinOutlineLayers(map, stateGeo, { dark: darkMode });
       applyChoropleth(map);
     },
     [applyChoropleth, darkMode]

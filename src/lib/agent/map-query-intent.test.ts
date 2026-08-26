@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferMapQueryIntent } from "@/lib/agent/map-query-intent";
+import { inferMapQueryIntent, withUserAreaIntent } from "@/lib/agent/map-query-intent";
 
 describe("inferMapQueryIntent", () => {
   it("returns null for empty or meaningless input", () => {
@@ -40,6 +40,35 @@ describe("inferMapQueryIntent", () => {
 
   it("detects business journal news intent", () => {
     expect(inferMapQueryIntent("company relocation news in Wisconsin")?.bizJournalNews).toBe(true);
+  });
+
+  it("treats carousel news preprompts as local news, not jobs", () => {
+    const intent = inferMapQueryIntent(
+      `What's the local impact of this news in Dane County? "School board votes on new hiring plan"`
+    );
+    expect(intent?.localNews).toBe(true);
+    expect(intent?.quotedHeadline).toBe("School board votes on new hiring plan");
+    expect(intent?.searchJobs).toBeUndefined();
+    expect(intent?.flyToCountyId).toBe("dane");
+  });
+
+  it("anchors a metric ask to the user's area when the prompt has no place", () => {
+    const parsed = inferMapQueryIntent("What's unemployment right now?");
+    const intent = withUserAreaIntent(parsed!, "What's unemployment right now?", {
+      countyId: "dane",
+      source: "browser",
+    });
+    expect(intent.metric).toBe("unemployment");
+    expect(intent.flyToCountyId).toBe("dane");
+  });
+
+  it("does not override statewide unemployment asks with the user area", () => {
+    const parsed = inferMapQueryIntent("Unemployment by county statewide");
+    const intent = withUserAreaIntent(parsed!, "Unemployment by county statewide", {
+      countyId: "dane",
+      source: "browser",
+    });
+    expect(intent.flyToCountyId).toBeUndefined();
   });
 
   it("prefers job search over wage metric when nursing is mentioned", () => {
