@@ -91,7 +91,7 @@ export function MapLegend({ metric, className }: MapLegendProps) {
       )}
     >
       <div className="border border-white/10 bg-navy-900/85 px-4 py-3 backdrop-blur-xl">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/45">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">
           {METRIC_LABELS[metric]}
         </p>
         <div
@@ -100,7 +100,7 @@ export function MapLegend({ metric, className }: MapLegendProps) {
             background: `linear-gradient(to right, ${stops.map(([, c]) => c).join(", ")})`,
           }}
         />
-        <div className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-white/50">
+        <div className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-white/70">
           <span>{formatMetricScaleEndpoint(metric, "min")}</span>
           <span>{formatMetricScaleEndpoint(metric, "max")}</span>
         </div>

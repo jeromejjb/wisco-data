@@ -15,6 +15,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { cn } from "@/lib/utils";
 import { useMapStore } from "@/lib/map-store";
 import { useAppStore } from "@/lib/store";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { mapFlyDurationMs } from "@/lib/motion";
 import { FIPS_BY_COUNTY_ID } from "@/lib/wi-counties";
 import { fipsFromCountyId, getCountyCoordinates, countyIdFromFips, countyDisplayName } from "@/lib/county-lookup";
 import { userAreaFromCountyId } from "@/lib/user-area";
@@ -46,6 +48,7 @@ import type { MapMarkerAction } from "@/lib/agent/map-actions";
 import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { topicLabel, toneColor } from "@/lib/news-geo";
 import type { LocalNewsMapPin } from "@/lib/news-types";
+import { escapeHtml, safeHref } from "@/lib/escape-html";
 
 type AgentMapProps = {
   className?: string;
@@ -67,6 +70,7 @@ type MarkerEntry = {
   marker: Marker;
   color: string;
   label?: string;
+  selected?: boolean;
 };
 
 function syncMarkerDom(el: HTMLElement, marker: MapMarkerAction) {
@@ -75,6 +79,7 @@ function syncMarkerDom(el: HTMLElement, marker: MapMarkerAction) {
   const dot = el.querySelector<HTMLElement>(".map-marker-dot");
   if (ring) ring.style.backgroundColor = color;
   if (dot) dot.style.backgroundColor = color;
+  el.classList.toggle("map-marker-selected", Boolean(marker.selected));
 
   const existingLabel = el.querySelector<HTMLElement>(".map-marker-label");
   if (marker.label) {
@@ -130,15 +135,18 @@ function createNewsMarkerElement(pin: LocalNewsMapPin): HTMLElement {
 }
 
 function newsPopupHtml(pin: LocalNewsMapPin): string {
-  const topic = topicLabel(pin.topic).toUpperCase();
-  const place = pin.countyName ? `${topic} · ${pin.countyName}` : topic;
-  const link = pin.url
-    ? `<a href="${pin.url}" target="_blank" rel="noopener noreferrer" class="map-news-popup-link">Read story →</a>`
+  const topic = escapeHtml(topicLabel(pin.topic).toUpperCase());
+  const place = pin.countyName
+    ? `${topic} · ${escapeHtml(pin.countyName)}`
+    : topic;
+  const href = safeHref(pin.url);
+  const link = href
+    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="map-news-popup-link">Read story →</a>`
     : "";
   return `<div class="map-news-popup-card">
     <p class="map-news-popup-kicker">${place}</p>
-    <p class="map-news-popup-headline">${pin.headline}</p>
-    ${pin.blurb ? `<p class="map-news-popup-blurb">${pin.blurb}</p>` : ""}
+    <p class="map-news-popup-headline">${escapeHtml(pin.headline)}</p>
+    ${pin.blurb ? `<p class="map-news-popup-blurb">${escapeHtml(pin.blurb)}</p>` : ""}
     ${link}
   </div>`;
 }
@@ -194,6 +202,7 @@ export function AgentMap({
   const choroplethSigRef = useRef("");
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const darkMode = useAppStore((s) => s.darkMode);
+  const reducedMotion = usePrefersReducedMotion();
 
   const [mapStyleId, setMapStyleId] = useState<MapStyleId>(defaultStyleId);
   const onSatellite = isSatelliteStyle(mapStyleId);
@@ -219,7 +228,6 @@ export function AgentMap({
     mapPaintNonce,
     answerPin,
     localNewsPins,
-    localMapAnswer,
   } = useMapStore(
     useShallow((s) => ({
       center: s.center,
@@ -239,7 +247,6 @@ export function AgentMap({
       mapPaintNonce: s.mapPaintNonce,
       answerPin: s.answerPin,
       localNewsPins: s.localNewsPins,
-      localMapAnswer: s.localMapAnswer,
     }))
   );
 
@@ -255,11 +262,11 @@ export function AgentMap({
   }, [mapDemographics, choroplethMetric, choroplethValues, choroplethLabels]);
 
   useEffect(() => {
-    if (mapPaintNonce === 0) return;
+    if (mapPaintNonce === 0 || reducedMotion) return;
     setMapPulsing(true);
     const timer = window.setTimeout(() => setMapPulsing(false), 1800);
     return () => window.clearTimeout(timer);
-  }, [mapPaintNonce]);
+  }, [mapPaintNonce, reducedMotion]);
 
   const applyChoropleth = useCallback(
     (map: MapLibreMap) => {
@@ -684,13 +691,13 @@ export function AgentMap({
     map.flyTo({
       center: [center.lng, center.lat],
       zoom,
-      pitch,
-      bearing,
-      duration: immersive ? 900 : 2400,
-      essential: true,
+      pitch: reducedMotion ? 0 : pitch,
+      bearing: reducedMotion ? 0 : bearing,
+      duration: mapFlyDurationMs(reducedMotion, immersive),
+      essential: false,
       curve: immersive ? 1.2 : 1.35,
     });
-  }, [flyToNonce, center, zoom, pitch, bearing, immersive]);
+  }, [flyToNonce, center, zoom, pitch, bearing, immersive, reducedMotion]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -750,10 +757,15 @@ export function AgentMap({
 
       if (existing) {
         existing.marker.setLngLat([marker.coordinates.lng, marker.coordinates.lat]);
-        if (existing.color !== color || existing.label !== marker.label) {
+        if (
+          existing.color !== color ||
+          existing.label !== marker.label ||
+          existing.selected !== marker.selected
+        ) {
           syncMarkerDom(existing.marker.getElement(), marker);
           existing.color = color;
           existing.label = marker.label;
+          existing.selected = marker.selected;
         }
         continue;
       }
@@ -764,6 +776,7 @@ export function AgentMap({
         .addTo(map);
 
       if (marker.label) {
+        const popupLabel = marker.label;
         el.addEventListener("click", () => {
           popupRef.current?.remove();
           popupRef.current = new Popup({
@@ -772,12 +785,19 @@ export function AgentMap({
             className: "workways-popup",
           })
             .setLngLat([marker.coordinates.lng, marker.coordinates.lat])
-            .setHTML(`<div class="workways-popup-inner"><strong>${marker.label}</strong></div>`)
+            .setHTML(
+              `<div class="workways-popup-inner"><strong>${escapeHtml(popupLabel)}</strong></div>`
+            )
             .addTo(map);
         });
       }
 
-      markersByIdRef.current.set(marker.id, { marker: mbMarker, color, label: marker.label });
+      markersByIdRef.current.set(marker.id, {
+        marker: mbMarker,
+        color,
+        label: marker.label,
+        selected: marker.selected,
+      });
     }
   }, [markers, mapLoaded]);
 
@@ -812,21 +832,9 @@ export function AgentMap({
     }
 
     answerPinPopupRef.current?.remove();
-    const headline =
-      answerPin.headline.length > 120
-        ? `${answerPin.headline.slice(0, 117)}…`
-        : answerPin.headline;
-    answerPinPopupRef.current = new Popup({
-      offset: 32,
-      closeButton: false,
-      className: "workways-answer-pin-popup",
-      maxWidth: "300px",
-    })
-      .setLngLat([coords.lng, coords.lat])
-      .setHTML(
-        `<div class="workways-answer-pin-card"><p class="workways-answer-pin-county">${answerPin.countyName}</p><p class="workways-answer-pin-headline">${headline}</p></div>`
-      )
-      .addTo(map);
+    answerPinPopupRef.current = null;
+    // Headline already lives in the summary card — a second map bubble
+    // repeats the same sentence and covers the map on phones.
   }, [answerPin, mapLoaded]);
 
   useEffect(() => {

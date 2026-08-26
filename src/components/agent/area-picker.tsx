@@ -49,7 +49,10 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
       setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        buttonRef.current?.focus();
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("touchstart", onPointerDown);
@@ -81,6 +84,11 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    dropdownRef.current?.focus();
   }, [open]);
 
   function pickCounty(countyId: string) {
@@ -119,25 +127,27 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
         disabled={loading}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-controls="area-picker-list"
+        aria-label={`Choose area, currently ${label}`}
         className={cn(
-          "inline-flex items-center gap-1 rounded-full font-medium transition-all duration-200",
+          "inline-flex min-h-11 items-center gap-1 rounded-full font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           compact
             ? "max-w-[min(36vw,120px)] py-0.5 pl-1.5 pr-1.5 text-[10px] sm:max-w-[140px] sm:py-1 sm:pl-2 sm:pr-2 sm:text-[11px]"
             : "max-w-[min(42vw,160px)] py-1 pl-2.5 pr-2 text-[11px]",
           open
-            ? "bg-[#e8f4fa] text-[#1e6b9c] ring-2 ring-[#1e6b9c]/20"
-            : "bg-[#f0f7fb] text-[#3d4659] ring-1 ring-[#1e6b9c]/12 hover:bg-[#e8f4fa] hover:ring-[#1e6b9c]/25"
+            ? "bg-[#e8f4fa] text-[#1e6b9c] ring-2 ring-[#1e6b9c]/20 dark:bg-[#1e6b9c]/25 dark:text-[#d7ecf8] dark:ring-[#4da3d4]/30"
+            : "bg-[#f0f7fb] text-[#3d4659] ring-1 ring-[#1e6b9c]/12 hover:bg-[#e8f4fa] hover:ring-[#1e6b9c]/25 dark:bg-white/10 dark:text-[#eef2f7] dark:ring-white/15 dark:hover:bg-white/14"
         )}
       >
         {loading ? (
           <GatheringPulse tone="lake" className="h-3 w-3 shrink-0" />
         ) : (
-          <MapPin className="h-3 w-3 shrink-0 text-[#1e6b9c]" />
+          <MapPin className="h-3 w-3 shrink-0 text-[#1e6b9c] dark:text-[#7ec4ea]" />
         )}
         <span className="text-left leading-tight">{loading && loadingLabel ? loadingLabel : label}</span>
         {!loading && (
           <ChevronDown
-            className={cn("h-3 w-3 shrink-0 text-[#1e6b9c]/70 transition-transform", open && "rotate-180")}
+            className={cn("h-3 w-3 shrink-0 text-[#1e6b9c]/70 transition-transform dark:text-[#7ec4ea]", open && "rotate-180")}
           />
         )}
       </button>
@@ -158,17 +168,19 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                   left: dropdownRect.left,
                   width: dropdownRect.width,
                 }}
-                className="z-[100] overflow-hidden rounded-2xl border border-black/[0.07] bg-white/98 shadow-[0_16px_48px_rgba(12,18,34,0.16)] backdrop-blur-xl"
+                className="z-[100] overflow-hidden rounded-2xl border border-black/[0.07] bg-white/98 shadow-[0_16px_48px_rgba(12,18,34,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0f1524]/98 dark:shadow-[0_16px_48px_rgba(0,0,0,0.45)]"
                 role="listbox"
+                id="area-picker-list"
                 aria-label="Choose your area"
+                tabIndex={-1}
               >
-                <div className="border-b border-black/[0.05] px-3.5 py-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#8b95a8]">
+                <div className="border-b border-black/[0.05] px-3.5 py-2.5 dark:border-white/10">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#8b95a8] dark:text-[#a8b0c0]">
                     Your area
                   </p>
-                  <p className="mt-0.5 text-[13px] font-semibold text-[#0c1222]">
+                  <p className="mt-0.5 text-[13px] font-semibold text-[#0c1222] dark:text-[#eef2f7]">
                     {area.displayName}
-                    <span className="ml-1 font-normal text-[#8b95a8]">· {area.countyName}</span>
+                    <span className="ml-1 font-normal text-[#8b95a8] dark:text-[#a8b0c0]">· {area.countyName}</span>
                   </p>
                 </div>
 
@@ -186,8 +198,8 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                           className={cn(
                             "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-[13px] transition-colors",
                             selected
-                              ? "bg-[#e8f4fa] font-semibold text-[#1e6b9c]"
-                              : "text-[#3d4659] hover:bg-[#f4f6f9]"
+                              ? "bg-[#e8f4fa] font-semibold text-[#1e6b9c] dark:bg-[#1e6b9c]/25 dark:text-[#d7ecf8]"
+                              : "text-[#3d4659] hover:bg-[#f4f6f9] dark:text-[#eef2f7] dark:hover:bg-white/8"
                           )}
                         >
                           <span>{name}</span>
@@ -198,27 +210,37 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                   })}
                 </ul>
 
-                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-black/[0.05] px-3 py-2.5">
-                  <span className="flex items-center gap-2">
+                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-black/[0.05] px-3 py-2.5 dark:border-white/10">
+                  <span className="flex min-w-0 items-center gap-2">
                     <Newspaper
                       className={cn(
                         "h-3.5 w-3.5 shrink-0",
-                        newsPromptsEnabled ? "text-amber-600" : "text-[#b0b8c8]"
+                        newsPromptsEnabled ? "text-amber-500" : "text-[#8b95a8] dark:text-[#a8b0c0]"
                       )}
                     />
-                    <span className="text-[13px] text-[#3d4659]">Local news pins</span>
+                    <span className="min-w-0">
+                      <span className="block text-[13px] text-[#3d4659] dark:text-[#eef2f7]">
+                        Local news
+                      </span>
+                    <span id="local-news-hint" className="block text-[10px] text-[#8b95a8] dark:text-[#a8b0c0]">
+                      {newsPromptsEnabled ? "Pins and headlines on" : "Off until you turn this on"}
+                    </span>
+                    </span>
                   </span>
                   <input
+                    id="local-news-toggle"
                     type="checkbox"
+                    role="switch"
                     className="sr-only"
                     checked={newsPromptsEnabled}
                     onChange={(e) => setNewsPromptsEnabled(e.target.checked)}
+                    aria-describedby="local-news-hint"
                   />
                   <span
                     aria-hidden
                     className={cn(
                       "relative h-[18px] w-8 shrink-0 rounded-full transition-colors",
-                      newsPromptsEnabled ? "bg-[#1e6b9c]" : "bg-[#d6dbe4]"
+                      newsPromptsEnabled ? "bg-[#1e6b9c]" : "bg-[#d6dbe4] dark:bg-white/20"
                     )}
                   >
                     <span
@@ -230,15 +252,15 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                   </span>
                 </label>
 
-                <div className="flex gap-1 border-t border-black/[0.05] p-1.5">
+                <div className="flex gap-1 border-t border-black/[0.05] p-1.5 dark:border-white/10">
                   <button
                     type="button"
                     onClick={useGps}
                     className={cn(
                       "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors",
                       browserLocationEnabled && !chosenArea
-                        ? "bg-[#ecfdf5] text-[#267a55]"
-                        : "text-[#5a6278] hover:bg-[#f4f6f9]"
+                        ? "bg-[#ecfdf5] text-[#267a55] dark:bg-emerald-500/15 dark:text-emerald-300"
+                        : "text-[#5a6278] hover:bg-[#f4f6f9] dark:text-[#c5cddb] dark:hover:bg-white/8"
                     )}
                   >
                     <Crosshair className="h-3.5 w-3.5" />
@@ -248,7 +270,7 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                     <button
                       type="button"
                       onClick={resetAuto}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-medium text-[#5a6278] transition-colors hover:bg-[#f4f6f9]"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-medium text-[#5a6278] transition-colors hover:bg-[#f4f6f9] dark:text-[#c5cddb] dark:hover:bg-white/8"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                       Auto

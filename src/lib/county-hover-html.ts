@@ -1,6 +1,7 @@
 import type { ChoroplethMetric } from "@/lib/agent/map-actions";
 import { formatPopulation, formatIncome } from "@/lib/format-population";
 import { formatCountyDataValue } from "@/components/map/map-story-banner";
+import { escapeHtml } from "@/lib/escape-html";
 
 export function buildCountyHoverHtml(input: {
   name: string;
@@ -13,7 +14,9 @@ export function buildCountyHoverHtml(input: {
   choroplethLabels: Record<string, string>;
   unemploymentRate?: number;
 }): string {
-  const countyLabel = input.name.endsWith(" County") ? input.name : `${input.name} County`;
+  const countyLabel = escapeHtml(
+    input.name.endsWith(" County") ? input.name : `${input.name} County`
+  );
   const rows: string[] = [];
 
   if (input.population && input.population > 0) {
@@ -30,7 +33,7 @@ export function buildCountyHoverHtml(input: {
   );
   if (dataLine) {
     rows.push(
-      `<div class="county-popup-stat"><span class="county-popup-stat-label">Layer</span><span class="county-popup-stat-value">${dataLine}</span></div>`
+      `<div class="county-popup-stat"><span class="county-popup-stat-label">Layer</span><span class="county-popup-stat-value">${escapeHtml(dataLine)}</span></div>`
     );
   } else if (input.unemploymentRate != null) {
     rows.push(

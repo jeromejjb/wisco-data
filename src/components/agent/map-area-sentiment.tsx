@@ -16,10 +16,10 @@ type MapAreaSentimentProps = {
 export function MapAreaSentiment({ className }: MapAreaSentimentProps) {
   const selectedCounty = useMapStore((s) => s.selectedCounty);
   const pins = useMapStore((s) => s.localNewsPins);
-  const { showAnswerStack } = useMapSession();
+  const { showAnswerStack, newsPromptsEnabled } = useMapSession();
 
   const headline = pins[0];
-  const open = Boolean(headline) && !selectedCounty;
+  const open = Boolean(headline) && !selectedCounty && newsPromptsEnabled;
 
   return (
     <AnimatePresence>
@@ -40,14 +40,14 @@ export function MapAreaSentiment({ className }: MapAreaSentimentProps) {
             <div className="flex items-start gap-2">
               <Newspaper className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden />
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b95a8]">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#8b95a8] dark:text-[#b4bcc9]">
                   Local headline
                   {headline.countyName ? ` · ${headline.countyName}` : ""}
                 </p>
-                <p className="mt-0.5 text-[12px] font-medium leading-snug text-[#2a3344] dark:text-white/90">
+                <p className="mt-0.5 text-[12px] font-medium leading-snug text-[#2a3344] dark:text-[#eef2f7]">
                   {headline.headline}
                 </p>
-                <p className="mt-1 text-[10px] text-[#8b95a8]">
+                <p className="mt-1 text-[10px] text-[#8b95a8] dark:text-[#a8b0c0]">
                   {topicLabel(headline.topic as NewsTopic)} · use prompt carousel to ask about this
                 </p>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -9,18 +9,20 @@ import {
   Wallet,
   Briefcase,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import useSWR from "swr";
 import { cn } from "@/lib/utils";
 import { useMapStore } from "@/lib/map-store";
 import {
   buildCountyExplorerSnapshot,
-  metricLabelForExplorer,
+  choroplethTileForExplorer,
 } from "@/lib/county-explorer";
 import { formatPopulation, formatIncome } from "@/lib/format-population";
 import { WI_COUNTIES } from "@/lib/wi-counties";
 import type { CountyEconomy } from "@/lib/types";
 import { AnswerCard } from "./answer-panel-chrome";
+import { useMapSession } from "./map-session-provider";
 
 const fetcher = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null));
 
@@ -38,6 +40,9 @@ export function MapCountyPanel({ className }: { className?: string }) {
   const mapDemographics = useMapStore((s) => s.mapDemographics);
   const choroplethMetric = useMapStore((s) => s.choroplethMetric);
   const choroplethValues = useMapStore((s) => s.choroplethValues);
+  const { showAnswerStack } = useMapSession();
+  const jobCount = useMapStore((s) => s.localMapAnswer?.jobs.length ?? 0);
+  const [bodyOpen, setBodyOpen] = useState(true);
 
   const isFeatured = selectedCounty
     ? WI_COUNTIES.some((c) => c.id === selectedCounty.countyId)
@@ -117,20 +122,33 @@ export function MapCountyPanel({ className }: { className?: string }) {
         });
       }
     }
-    if (
-      snapshot.choroplethFormatted &&
-      snapshot.choroplethMetric &&
-      snapshot.choroplethMetric !== "unemployment"
-    ) {
+    const layer = choroplethTileForExplorer(snapshot);
+    if (layer) {
       items.push({
         icon: TrendingDown,
-        label: metricLabelForExplorer(snapshot.choroplethMetric),
-        value: snapshot.choroplethFormatted,
-        hint: "Map layer",
+        label: layer.label,
+        value: layer.value,
+        hint: layer.hint,
       });
     }
     return items;
   }, [snapshot]);
+
+  useEffect(() => {
+    if (!selectedCounty) return;
+    const shareScreen =
+      showAnswerStack && window.matchMedia("(max-width: 1023px)").matches;
+    setBodyOpen(!shareScreen);
+  }, [selectedCounty, selectedCounty?.fips, showAnswerStack]);
+
+  useEffect(() => {
+    if (!selectedCounty) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") clearSelectedCounty();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedCounty, clearSelectedCounty]);
 
   return (
     <AnimatePresence>
@@ -141,67 +159,101 @@ export function MapCountyPanel({ className }: { className?: string }) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          role="region"
+          aria-labelledby="county-panel-title"
           className={cn(
             "pointer-events-none fixed z-30",
             // Anchored to the dock's live measured height (--dock-total, set by
             // MapChatWidget's ResizeObserver) — never slides under the dock.
-            "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)] max-h-[min(50dvh,520px)]",
-            "sm:inset-x-auto sm:bottom-auto sm:left-4 sm:top-[4.5rem] sm:max-h-[calc(100dvh-8rem)] lg:top-20",
-            "w-auto sm:w-[min(340px,calc(100vw-2rem))]",
+            "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)]",
+            showAnswerStack
+              ? "max-h-[min(34dvh,300px)]"
+              : "max-h-[min(42dvh,420px)]",
+            jobCount > 0 && "max-lg:hidden",
+            "lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-20 lg:max-h-[calc(100dvh-8rem)]",
+            "w-auto lg:w-[min(340px,calc(100vw-2rem))]",
             className
           )}
         >
-          <AnswerCard className="flex max-h-[inherit] flex-col">
+          <AnswerCard className="pointer-events-auto flex max-h-[inherit] flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3.5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300/70">
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-3.5 py-2.5 sm:px-4 sm:py-3.5">
+              <button
+                type="button"
+                onClick={() => setBodyOpen((v) => !v)}
+                className="min-w-0 flex-1 text-left lg:pointer-events-none"
+                aria-expanded={bodyOpen}
+                aria-label={bodyOpen ? "Collapse county details" : "Expand county details"}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">
                   County
                 </p>
-                <h2 className="font-display text-[20px] font-bold leading-tight tracking-[-0.02em] text-white sm:text-[22px]">
+                <h2
+                  id="county-panel-title"
+                  className="font-display text-[18px] font-bold leading-tight tracking-[-0.02em] text-white sm:text-[22px]"
+                >
                   {snapshot.shortName}
                 </h2>
                 {snapshot.population ? (
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-white/55">
-                    <Users className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-white/70">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-cyan-200/80" strokeWidth={2.25} />
                     {formatPopulation(snapshot.population, {
                       estimate: snapshot.populationIsEstimate,
                     })}
                     {snapshot.populationIsEstimate ? " (est.)" : ""}
+                    {!bodyOpen && snapshot.unemploymentRate != null ? (
+                      <span className="text-white/80">
+                        · {snapshot.unemploymentRate.toFixed(1)}%
+                      </span>
+                    ) : null}
                   </p>
                 ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={() => clearSelectedCounty()}
-                className="pointer-events-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/55 transition-colors hover:bg-white/14 hover:text-white"
-                aria-label="Close county panel"
-              >
-                <X className="h-4 w-4" />
               </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <span
+                  className="flex h-8 w-8 items-center justify-center text-white/80 lg:hidden"
+                  aria-hidden
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform duration-200",
+                      !bodyOpen && "-rotate-90"
+                    )}
+                  />
+                </span>
+                <button
+                  type="button"
+                  onClick={() => clearSelectedCounty()}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/80 transition-colors hover:bg-white/16 hover:text-white"
+                  aria-label="Close county panel"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <div className="overflow-y-auto overscroll-contain px-4 py-3.5">
+            {bodyOpen && (
+            <div className="overflow-y-auto overscroll-contain px-3.5 py-3 sm:px-4 sm:py-3.5">
               {/* Hero unemployment */}
               {snapshot.unemploymentRate != null && (
-                <div className="rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] px-4 py-3.5">
+                <div className="rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] px-3.5 py-3 sm:px-4 sm:py-3.5">
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-white/65">
                         Unemployment
                       </p>
-                      <p className="font-display text-[32px] font-bold tabular-nums leading-none text-white">
+                      <p className="font-display text-[28px] font-bold tabular-nums leading-none text-white sm:text-[32px]">
                         {snapshot.unemploymentRate.toFixed(1)}%
                       </p>
                     </div>
                     {uRank && (
                       <div className="text-right">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-white/40">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-white/65">
                           Statewide
                         </p>
                         <p className="font-display text-lg font-bold tabular-nums text-cyan-200">
                           #{uRank.rank}
-                          <span className="text-sm font-medium text-white/45">
+                          <span className="text-sm font-medium text-white/60">
                             {" "}
                             / {uRank.total}
                           </span>
@@ -209,7 +261,7 @@ export function MapCountyPanel({ className }: { className?: string }) {
                       </div>
                     )}
                   </div>
-                  <p className="mt-2 text-[10px] text-white/35">
+                  <p className="mt-2 text-[10px] text-white/50">
                     Wisconsin DWD WisConomy · BLS LAUS
                   </p>
                 </div>
@@ -224,13 +276,15 @@ export function MapCountyPanel({ className }: { className?: string }) {
                 </div>
               )}
             </div>
+            )}
 
-            <div className="mt-auto border-t border-white/8 px-4 py-2.5">
-              <p className="flex items-center gap-1 text-[10px] leading-relaxed text-white/35">
+            {bodyOpen && (
+            <div className="mt-auto border-t border-white/10 px-3.5 py-2 sm:px-4 sm:py-2.5">
+              <p className="flex items-center gap-1 text-[10px] leading-relaxed text-white/55">
                 <span>Tap another county to compare</span>
-                <ChevronRight className="h-3 w-3 opacity-50" />
+                <ChevronRight className="h-3 w-3 text-white/70" />
               </p>
-              <p className="mt-1 text-[9px] text-white/25">
+              <p className="mt-1 text-[9px] text-white/45">
                 <a
                   href="https://www.census.gov/programs-surveys/acs"
                   target="_blank"
@@ -250,6 +304,7 @@ export function MapCountyPanel({ className }: { className?: string }) {
                 </a>
               </p>
             </div>
+            )}
           </AnswerCard>
         </motion.div>
       )}
@@ -269,17 +324,17 @@ function StatTile({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.04] px-3 py-2.5">
+    <div className="rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2.5">
       <div className="flex items-center gap-1.5">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-cyan-300/60" />
-        <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/45">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-cyan-200" strokeWidth={2.25} />
+        <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/70">
           {label}
         </p>
       </div>
       <p className="mt-1.5 font-display text-[17px] font-bold tabular-nums leading-none text-white">
         {value}
       </p>
-      {hint && <p className="mt-1 text-[9px] text-white/30">{hint}</p>}
+      {hint && <p className="mt-1 text-[9px] text-white/50">{hint}</p>}
     </div>
   );
 }

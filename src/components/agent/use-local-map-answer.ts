@@ -45,7 +45,8 @@ export function useLocalMapAnswer(
   status: string,
   error: Error | undefined,
   onApplied?: () => void,
-  _area?: { displayName: string; countyId: string }
+  area?: { displayName: string; countyId: string },
+  newsEnabled = false
 ) {
   const applyActions = useMapStore((s) => s.applyActions);
   const setLocalMapAnswer = useMapStore((s) => s.setLocalMapAnswer);
@@ -87,18 +88,18 @@ export function useLocalMapAnswer(
 
     processedTurnRef.current = turnKey;
 
-    void buildLocalMapAnswer(intent).then((answer) => {
+    void buildLocalMapAnswer(intent, { area }).then((answer) => {
       if (!answer) return;
       setLocalMapAnswer(answer);
       if (answer.mapActions.length) {
         applyActions(answer.mapActions);
       }
-      if (answer.bizMapPins?.length) {
+      if (newsEnabled && answer.bizMapPins?.length) {
         useMapStore.getState().setLocalNewsLayer(answer.bizMapPins, null);
       }
       onAppliedRef.current?.();
     });
-  }, [messages, status, error, applyActions, setLocalMapAnswer]);
+  }, [messages, status, error, applyActions, setLocalMapAnswer, area, newsEnabled]);
 }
 
 /** @deprecated use useLocalMapAnswer */

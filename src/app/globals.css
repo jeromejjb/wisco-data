@@ -401,8 +401,14 @@ body {
 
 /* Immersive home map — map + chat widget only */
 .map-ask-dock {
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+}
+@media (max-width: 639px) {
+  .map-ask-dock {
+    -webkit-backdrop-filter: blur(10px) saturate(1.05);
+    backdrop-filter: blur(10px) saturate(1.05);
+  }
 }
 
 .map-prompt-scroll {
@@ -489,6 +495,34 @@ body {
 }
 .float-scroll::-webkit-scrollbar {
   display: none;
+}
+
+/* Job sheet list — visible thin scrollbar so “15 roles” is obviously scrollable. */
+.job-sheet-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(255, 255, 255, 0.38) transparent;
+  scrollbar-width: thin;
+  touch-action: pan-y;
+}
+.job-sheet-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.job-sheet-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.34);
+  border-radius: 99px;
+}
+
+.map-marker-selected {
+  transform: scale(1.38);
+  z-index: 12;
+}
+.map-marker-selected .map-marker-ring {
+  opacity: 0.55;
+  transform: scale(2.55);
+}
+.map-marker-selected .map-marker-dot {
+  box-shadow: 0 0 0 3px #fff, 0 4px 14px rgba(4, 8, 18, 0.45);
 }
 
 /* Geographic answer pin (Option C) */
@@ -636,6 +670,13 @@ body {
   color: #67e8f9;
 }
 
+.map-ask-dock {
+  box-shadow: var(--shadow-dock);
+}
+.map-ask-dock.is-focused {
+  box-shadow: var(--shadow-dock-focus), 0 0 0 2px var(--ring);
+}
+
 .map-ask-input,
 .map-ask-input:focus,
 .map-ask-input:focus-visible {
@@ -643,6 +684,12 @@ body {
   outline-offset: 0 !important;
   box-shadow: none !important;
   border: none !important;
+  -webkit-text-fill-color: currentColor;
+}
+
+.dark .map-ask-input {
+  color: #eef2f7;
+  caret-color: #4da3d4;
 }
 
 :focus-visible {
@@ -653,6 +700,87 @@ body {
 :focus-visible.map-ask-input {
   outline: none !important;
   outline-offset: 0 !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-links {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  pointer-events: auto;
+  position: fixed;
+  top: 4.75rem;
+  left: 0.75rem;
+  z-index: 200;
+  width: auto;
+  height: auto;
+  margin: 0;
+  clip: auto;
+  overflow: visible;
+  border-radius: 0.75rem;
+  background: var(--navy-900);
+  color: #fff;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.skip-link + .skip-link:focus,
+.skip-link + .skip-link:focus-visible {
+  left: 0.75rem;
+  top: 3.5rem;
+}
+
+/* Material / Apple: 44–48px minimum interactive target on pointer UIs */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Scrollbar polish */

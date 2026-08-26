@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, type PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight, Newspaper, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { starterDisplayText, type ChatStarter } from "@/lib/agent/chat-starters";
@@ -21,6 +21,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
   // Touch pause: auto-advance must not swap the pill between touchstart and
   // tap on mobile, or the user sends a different prompt than the one they saw.
   const [touchPaused, setTouchPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const count = starters.length;
   const current = starters[index];
@@ -46,34 +47,34 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
   }, [touchPaused]);
 
   useEffect(() => {
-    if (paused || touchPaused || disabled || count <= 1) return;
+    if (paused || touchPaused || disabled || count <= 1 || reduceMotion) return;
     const timer = window.setInterval(() => go(1), AUTO_ADVANCE_MS);
     return () => window.clearInterval(timer);
-  }, [paused, touchPaused, disabled, count, go]);
+  }, [paused, touchPaused, disabled, count, go, reduceMotion]);
 
   if (!count || !current) return null;
 
   const slideVariants = {
     enter: (d: number) => ({
       opacity: 0,
-      x: d > 0 ? 20 : -20,
-      filter: "blur(3px)",
+      x: reduceMotion ? 0 : d > 0 ? 20 : -20,
     }),
     center: {
       opacity: 1,
       x: 0,
-      filter: "blur(0px)",
     },
     exit: (d: number) => ({
       opacity: 0,
-      x: d > 0 ? -20 : 20,
-      filter: "blur(3px)",
+      x: reduceMotion ? 0 : d > 0 ? -20 : 20,
     }),
   };
 
   return (
     <div
       className="relative flex min-w-0 flex-1 items-center"
+      role="group"
+      aria-label="Suggested questions"
+      aria-roledescription="carousel"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -106,16 +107,16 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
             onClick={() => onPick(current)}
             title={current.text}
             className={cn(
-              "flex min-h-[28px] w-full items-center justify-center gap-1.5 rounded-full px-3 py-1 sm:min-h-[32px] disabled:opacity-50",
+              "flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 sm:min-h-11 disabled:opacity-50",
               current.kind === "news"
-                ? "bg-amber-50/90 text-[11px] font-medium text-amber-950 ring-1 ring-amber-200/60"
-                : "bg-[#f4f6f9]/95 text-[11px] font-medium text-[#2a3344] ring-1 ring-black/[0.05] sm:text-[12px]"
+                ? "bg-amber-50/90 text-[11px] font-medium text-amber-950 ring-1 ring-amber-200/60 dark:bg-amber-500/15 dark:text-amber-50 dark:ring-amber-400/25"
+                : "bg-[#f4f6f9]/95 text-[11px] font-medium text-[#2a3344] ring-1 ring-black/[0.05] sm:text-[12px] dark:bg-white/12 dark:text-[#eef2f7] dark:ring-white/12"
             )}
           >
             {current.kind === "news" ? (
               <Newspaper className="h-3 w-3 shrink-0 text-amber-600" aria-hidden />
             ) : (
-              <Sparkles className="h-3 w-3 shrink-0 text-[#1e6b9c]/70" aria-hidden />
+              <Sparkles className="h-3 w-3 shrink-0 text-[#1e6b9c] dark:text-[#7ec4ea]" aria-hidden />
             )}
             <span className="whitespace-nowrap leading-tight">{starterDisplayText(current)}</span>
           </motion.button>
@@ -164,7 +165,7 @@ function CarouselNav({
       disabled={disabled}
       onClick={onClick}
       aria-label={direction === "prev" ? "Previous suggestion" : "Next suggestion"}
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#9aa3b5] transition-colors hover:bg-black/[0.04] hover:text-[#3d4659] disabled:opacity-40"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#6b7388] transition-colors hover:bg-black/[0.04] hover:text-[#3d4659] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 dark:text-[#c5cddb] dark:hover:bg-white/10 dark:hover:text-white"
     >
       <Icon className="h-3.5 w-3.5" />
     </button>
