@@ -47,7 +47,7 @@ import {
   type MapStyleId,
 } from "@/lib/map-styles";
 import { MapBasemapSwitcher } from "./map-basemap-switcher";
-import { MapWebGLUnavailable } from "./map-webgl-unavailable";
+import { RasterFallbackMap } from "./raster-fallback-map";
 import {
   isGpuInitializationError,
   probeWebGL2,
@@ -965,20 +965,27 @@ export function AgentMap({
           <p className="text-[11px] text-white/80">Loading map…</p>
         </div>
       )}
-      {webglProbe && <MapWebGLUnavailable probe={webglProbe} />}
+      {webglProbe ? (
+        <RasterFallbackMap
+          immersive={immersive}
+          darkMode={forceLightBasemap ? false : darkMode}
+          mapStyleId={mapStyleId}
+        />
+      ) : (
+        <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />
+      )}
       {mapError && !webglProbe && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-[#eef2f6] px-6 text-center dark:bg-navy-900">
           <p className="text-sm font-medium text-foreground">Map unavailable</p>
           <p className="text-xs text-muted-foreground">{mapError}</p>
         </div>
       )}
-      <div ref={containerRef} className="absolute inset-0 z-0 h-full w-full" />
       {!immersive && mapLoaded && !countiesReady && (
         <div className="pointer-events-none absolute bottom-14 left-4 z-10 rounded-full bg-navy-900/70 px-2.5 py-1 text-[10px] text-white/60 backdrop-blur-sm">
           Loading counties…
         </div>
       )}
-      {!immersive && (
+      {!immersive && (mapLoaded || webglProbe) && (
         <>
           <MapStoryBanner
             metric={choroplethMetric}
