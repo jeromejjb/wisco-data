@@ -22,6 +22,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- County selection, prompt carousel, and map camera moves settle faster so the map feels snappier.
 - Ensure-PR job explains when GitHub Actions is blocked from opening pull requests, instead of dumping a Node stack trace.
 - Map no longer crashes with `painter is undefined` when Firefox blocks WebGL2; it explains how to turn WebGL back on.
 - Tapping a carousel prompt now shows the asked question and its data (news headline, county numbers) on phones, not only on the map.

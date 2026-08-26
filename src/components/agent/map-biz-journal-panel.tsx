@@ -13,12 +13,12 @@ type MapBizJournalPanelProps = {
 
 const listVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: 0.03, delayChildren: 0.02 } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, x: -10 },
-  visible: { opacity: 1, x: 0, transition: { type: "spring" as const, stiffness: 320, damping: 28 } },
+  hidden: { opacity: 0, x: -6 },
+  visible: { opacity: 1, x: 0, transition: { type: "spring" as const, stiffness: 560, damping: 36 } },
 };
 
 export function MapBizJournalPanel({
@@ -54,7 +54,7 @@ export function MapBizJournalPanel({
               key={story.id}
               variants={itemVariants}
               whileHover={{ y: -3, scale: 1.012 }}
-              transition={{ type: "spring", stiffness: 400, damping: 24 }}
+              transition={{ type: "spring", stiffness: 560, damping: 36 }}
               className="group relative overflow-hidden rounded-xl border border-white/8 bg-gradient-to-br from-white/[0.06] to-white/[0.02] px-3.5 py-3 shadow-[0_2px_10px_rgba(0,0,0,0.15)] transition-[border-color,box-shadow] hover:border-amber-300/25 hover:shadow-[0_10px_28px_rgba(251,191,36,0.1)]"
             >
               <span

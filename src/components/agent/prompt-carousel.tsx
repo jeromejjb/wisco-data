@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion, type PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight, Newspaper, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { promptSlide } from "@/lib/motion";
 import { starterDisplayText, type ChatStarter } from "@/lib/agent/chat-starters";
 
 const AUTO_ADVANCE_MS = 4800;
@@ -57,7 +58,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
   const slideVariants = {
     enter: (d: number) => ({
       opacity: 0,
-      x: reduceMotion ? 0 : d > 0 ? 20 : -20,
+      x: reduceMotion ? 0 : d > 0 ? 8 : -8,
     }),
     center: {
       opacity: 1,
@@ -65,7 +66,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
     },
     exit: (d: number) => ({
       opacity: 0,
-      x: reduceMotion ? 0 : d > 0 ? -20 : 20,
+      x: reduceMotion ? 0 : d > 0 ? -8 : 8,
     }),
   };
 
@@ -86,7 +87,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
       )}
 
       <div className="relative mx-0.5 min-w-0 flex-1 overflow-hidden rounded-full">
-        <AnimatePresence custom={direction} mode="wait" initial={false}>
+        <AnimatePresence custom={direction} mode="popLayout" initial={false}>
           <motion.button
             key={current.id}
             type="button"
@@ -96,10 +97,10 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ type: "spring", stiffness: 460, damping: 36 }}
+            transition={promptSlide}
             drag={count > 1 ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.12}
+            dragElastic={0.08}
             onDragEnd={(_e, info: PanInfo) => {
               if (info.offset.x < -36) go(1);
               else if (info.offset.x > 36) go(-1);
@@ -139,7 +140,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
                 width: i === index ? 10 : 3,
                 opacity: i === index ? 0.55 : 0.2,
               }}
-              transition={{ type: "spring", stiffness: 500, damping: 32 }}
+              transition={promptSlide}
               className="h-0.5 rounded-full bg-[#1e6b9c]"
             />
           ))}

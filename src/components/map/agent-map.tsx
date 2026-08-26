@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { useMapStore } from "@/lib/map-store";
 import { useAppStore } from "@/lib/store";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
-import { mapFlyDurationMs } from "@/lib/motion";
+import { mapFlyDurationMs, mapPaintTransition } from "@/lib/motion";
 import { FIPS_BY_COUNTY_ID } from "@/lib/wi-counties";
 import { fipsFromCountyId, getCountyCoordinates, countyIdFromFips, countyDisplayName } from "@/lib/county-lookup";
 import { userAreaFromCountyId } from "@/lib/user-area";
@@ -386,6 +386,8 @@ export function AgentMap({
                   ? "rgba(26,39,68,0.35)"
                   : "rgba(30,107,156,0.12)",
               "fill-opacity": onSatellite ? 0.35 : 0.85,
+              "fill-opacity-transition": mapPaintTransition,
+              "fill-color-transition": { duration: 140, delay: 0 },
               "fill-outline-color": onSatellite
                 ? "rgba(255,255,255,0.5)"
                 : "rgba(30,107,156,0.45)",
@@ -419,6 +421,8 @@ export function AgentMap({
                 onSatellite ? 2 : 1.6,
               ],
               "line-opacity": 0.85,
+              "line-opacity-transition": mapPaintTransition,
+              "line-color-transition": mapPaintTransition,
             },
           },
           beforeLabels
@@ -440,6 +444,9 @@ export function AgentMap({
             "line-color": onSatellite ? "#fde047" : "#d4824a",
             "line-width": 3.5,
             "line-opacity": 0,
+            "line-opacity-transition": mapPaintTransition,
+            "line-width-transition": mapPaintTransition,
+            "line-color-transition": mapPaintTransition,
           },
           filter: ["==", ["get", "fips"], ""],
         });
@@ -754,7 +761,7 @@ export function AgentMap({
       bearing: reducedMotion ? 0 : bearing,
       duration: mapFlyDurationMs(reducedMotion, immersive),
       essential: false,
-      curve: immersive ? 1.2 : 1.35,
+      curve: immersive ? 1.05 : 1.12,
     });
   }, [flyToNonce, center, zoom, pitch, bearing, immersive, reducedMotion]);
 

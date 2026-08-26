@@ -7,6 +7,7 @@ import { useMapStore } from "@/lib/map-store";
 import { topicLabel } from "@/lib/news-geo";
 import type { NewsTopic } from "@/lib/news-types";
 import { useMapSession } from "./map-session-provider";
+import { overlaySpring } from "@/lib/motion";
 
 type MapAreaSentimentProps = {
   className?: string;
@@ -29,7 +30,7 @@ export function MapAreaSentiment({ className }: MapAreaSentimentProps) {
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
-          transition={{ type: "spring", stiffness: 420, damping: 32 }}
+          transition={overlaySpring}
           className={cn(
             "pointer-events-none fixed left-4 top-[4.5rem] z-20 w-[min(300px,calc(100vw-2rem))] lg:top-20",
             showAnswerStack && "max-sm:hidden",

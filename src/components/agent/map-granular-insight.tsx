@@ -123,7 +123,7 @@ export function MapGranularInsight({ focus, className }: MapGranularInsightProps
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
                 className="space-y-3 overflow-hidden"
               >
               <div>
@@ -160,7 +160,7 @@ export function MapGranularInsight({ focus, className }: MapGranularInsightProps
                             <motion.div
                               initial={{ left: "0%", opacity: 0 }}
                               animate={{ left: `${peer.axisPct}%`, opacity: 1 }}
-                              transition={{ delay: i * 0.07, duration: 0.5, ease: "easeOut" }}
+                              transition={{ delay: i * 0.03, duration: 0.22, ease: "easeOut" }}
                               className={cn(
                                 "absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 shadow-sm",
                                 isFocus

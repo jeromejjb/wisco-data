@@ -189,7 +189,7 @@ export async function buildLocalMapAnswer(
           : intent.metric
             ? 8.15
             : 9,
-        pitch: 34,
+        pitch: 16,
       });
       if (!intent.metric && !intent.highlightCountyIds?.length) {
         actions.push({ type: "highlightCounties", countyIds: [intent.flyToCountyId] });
@@ -204,7 +204,7 @@ export async function buildLocalMapAnswer(
         : intent.transitMetro === "milwaukee"
           ? { lat: 43.0389, lng: -87.9065 }
           : { lat: 43.5, lng: -88.5 };
-    actions.push({ type: "flyTo", center, zoom: 10, pitch: 28 });
+    actions.push({ type: "flyTo", center, zoom: 10, pitch: 12 });
   }
 
   if (
@@ -452,7 +452,7 @@ async function loadJobsLayer(intent: MapQueryIntent) {
           type: "flyTo",
           center: { lat: avgLat, lng: avgLng },
           zoom: intent.searchJobs.transitOnly ? 10.5 : 9,
-          pitch: 32,
+          pitch: 14,
         });
       }
     }

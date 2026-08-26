@@ -137,7 +137,7 @@ export function MapChatWidget() {
   return (
     <motion.div
       ref={shellRef}
-      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={overlaySpring}
       className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center p-3 pb-[var(--safe-pb)] sm:p-4 sm:pb-[var(--safe-pb)]"

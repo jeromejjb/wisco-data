@@ -10,6 +10,7 @@ import { userAreaFromCountyId, type UserArea } from "@/lib/user-area";
 import { useAppStore } from "@/lib/store";
 import { useMapStore } from "@/lib/map-store";
 import { GatheringPulse } from "@/components/ui/data-gathering-loader";
+import { overlaySpring } from "@/lib/motion";
 
 type AreaPickerProps = {
   area: UserArea;
@@ -161,7 +162,7 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
                 initial={{ opacity: 0, y: 6, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                transition={{ type: "spring", stiffness: 480, damping: 32 }}
+                transition={overlaySpring}
                 style={{
                   position: "fixed",
                   bottom: dropdownRect.bottom,

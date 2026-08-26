@@ -102,7 +102,7 @@ export function MapAnswerStack() {
         <motion.div
           ref={stackRef}
           key="answer-stack"
-          initial={{ opacity: 0, y: hasJobResults ? 16 : 10 }}
+          initial={{ opacity: 0, y: hasJobResults ? 8 : 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={overlaySpring}
@@ -112,7 +112,7 @@ export function MapAnswerStack() {
             "pointer-events-none fixed z-30 flex flex-col",
             hasJobResults
               ? cn(
-                  "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)] motion-safe:transition-[height] motion-safe:duration-300 motion-safe:ease-out",
+                  "inset-x-3 bottom-[calc(var(--dock-total,10rem)+0.5rem)] motion-safe:transition-[height] motion-safe:duration-150 motion-safe:ease-out",
                   expanded
                     ? "h-[min(64dvh,calc(100dvh-var(--dock-total,10rem)-1.25rem))]"
                     : "h-[min(42dvh,380px)]",
@@ -187,7 +187,7 @@ export function MapAnswerStack() {
               </span>
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 shrink-0 text-white/70 transition-transform duration-200",
+                  "h-4 w-4 shrink-0 text-white/70 transition-transform duration-150",
                   !expanded && "rotate-180"
                 )}
                 aria-hidden
