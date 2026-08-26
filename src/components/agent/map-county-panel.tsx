@@ -100,18 +100,22 @@ export function MapCountyPanel({ className }: { className?: string }) {
       });
     }
     if (snapshot.featuredEconomy) {
-      items.push({
-        icon: Briefcase,
-        label: "Open jobs",
-        value: snapshot.featuredEconomy.openJobs.toLocaleString(),
-        hint: "Estimate",
-      });
-      items.push({
-        icon: Wallet,
-        label: "Median wage",
-        value: `$${Math.round(snapshot.featuredEconomy.medianWage / 1000)}k`,
-        hint: "QCEW proxy",
-      });
+      if (snapshot.featuredEconomy.openJobs != null) {
+        items.push({
+          icon: Briefcase,
+          label: "Open jobs",
+          value: snapshot.featuredEconomy.openJobs.toLocaleString(),
+          hint: "Estimate",
+        });
+      }
+      if (snapshot.featuredEconomy.medianWage != null) {
+        items.push({
+          icon: Wallet,
+          label: "Median wage",
+          value: `$${Math.round(snapshot.featuredEconomy.medianWage / 1000)}k`,
+          hint: "QCEW proxy",
+        });
+      }
     }
     if (
       snapshot.choroplethFormatted &&

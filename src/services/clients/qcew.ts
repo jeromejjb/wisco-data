@@ -1,5 +1,7 @@
 import { cached } from "@/lib/cache";
-import { WI_COUNTIES } from "@/lib/wi-counties";
+import { allCountyRecords } from "@/lib/county-lookup";
+import { countyIdFromFips } from "@/lib/wi-counties";
+import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
 
 export type QcewCountySnapshot = {
   fips: string;
@@ -30,8 +32,8 @@ function parseQcewCsv(csv: string): QcewCountySnapshot | null {
 
   return {
     fips,
-    countyId: WI_COUNTIES.find((c) => c.fips === fips)?.id ?? fips,
-    countyName: WI_COUNTIES.find((c) => c.fips === fips)?.name ?? `County ${fips}`,
+    countyId: countyIdFromFips(fips),
+    countyName: Object.entries(WI_COUNTY_NAME_TO_FIPS).find(([, f]) => f === fips)?.[0] ?? `County ${fips}`,
     employment: parseInt(cols[9], 10) || parseInt(cols[10], 10) || 0,
     avgWeeklyWage: parseInt(cols[15], 10) || 0,
     establishments: parseInt(cols[8], 10) || 0,
@@ -64,15 +66,24 @@ async function fetchCountyQcew(fips: string, year = 2024, quarter = 4) {
 }
 
 export async function fetchQcewCounties() {
-  return cached("qcew:counties", 24 * 60 * 60 * 1000, async () => {
-    const results = await Promise.all(
-      WI_COUNTIES.map(async (county) => {
-        const data = await fetchCountyQcew(county.fips);
-        if (!data) return null;
-        return { ...data, countyId: county.id, countyName: county.name };
-      })
-    );
-    return results.filter(Boolean) as QcewCountySnapshot[];
+  return cached("qcew:counties:v2", 24 * 60 * 60 * 1000, async () => {
+    const counties = allCountyRecords();
+    const results: QcewCountySnapshot[] = [];
+    const concurrency = 8;
+    for (let i = 0; i < counties.length; i += concurrency) {
+      const chunk = counties.slice(i, i + concurrency);
+      const settled = await Promise.allSettled(
+        chunk.map(async (county) => {
+          const data = await fetchCountyQcew(county.fips);
+          if (!data) return null;
+          return { ...data, countyId: county.id, countyName: county.name };
+        })
+      );
+      for (const row of settled) {
+        if (row.status === "fulfilled" && row.value) results.push(row.value);
+      }
+    }
+    return results;
   });
 }
 

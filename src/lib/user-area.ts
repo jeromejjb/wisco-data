@@ -1,8 +1,9 @@
 import { WI_COUNTIES } from "@/lib/wi-counties";
 import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
-import { countyIdFromFips, getCountyCoordinates } from "@/lib/county-lookup";
+import { allCountyRecords, countyIdFromFips, getCountyCoordinates } from "@/lib/county-lookup";
 import { WI_COUNTY_CENTROIDS } from "@/data/wi-county-centroids";
 import { metroRegions } from "@/data/mock/economy";
+import { WISCONSIN_CENTER } from "@/lib/map-styles";
 
 export type UserAreaSource = "home" | "saved" | "browser" | "ip" | "default" | "manual";
 
@@ -49,10 +50,11 @@ export function nearestCountyFromCoords(coords: {
   lat: number;
   lng: number;
 }): Pick<UserArea, "countyId" | "countyName" | "metroName" | "displayName" | "lat" | "lng"> {
-  let best: (typeof WI_COUNTIES)[number] = WI_COUNTIES[0];
+  const counties = allCountyRecords();
+  let best = counties[0]!;
   let bestDist = Infinity;
 
-  for (const c of WI_COUNTIES) {
+  for (const c of counties) {
     const d = haversineKm(coords, { lat: c.lat, lng: c.lng });
     if (d < bestDist) {
       bestDist = d;
@@ -142,7 +144,7 @@ export function resolveAreaFromCityLabel(
   for (const [label, countyId] of Object.entries(CITY_TO_COUNTY)) {
     if (!blob.includes(label)) continue;
     const area = userAreaFromCountyId(countyId);
-    if (area.countyId === DEFAULT_USER_AREA.countyId && countyId !== "milwaukee") continue;
+    if (area.countyId === "statewide") continue;
     return {
       countyId: area.countyId,
       countyName: area.countyName,
@@ -191,14 +193,14 @@ export function buildUserAreaFromGeo(input: {
   return fromCoords;
 }
 
-/** Milwaukee — largest metro; do NOT use geographic center (that resolves to Marathon). */
+/** Statewide frame when location is unknown — never a silent Milwaukee default. */
 export const DEFAULT_USER_AREA: UserArea = {
-  countyId: "milwaukee",
-  countyName: "Milwaukee County",
-  metroName: "Milwaukee Metro",
-  displayName: "Milwaukee",
-  lat: 43.0389,
-  lng: -87.9065,
+  countyId: "statewide",
+  countyName: "Wisconsin",
+  metroName: "Wisconsin",
+  displayName: "Wisconsin",
+  lat: WISCONSIN_CENTER.lat,
+  lng: WISCONSIN_CENTER.lng,
   source: "default",
   inWisconsin: true,
 };

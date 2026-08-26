@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getDataSourceStatuses,
   refreshAllLiveSources,
@@ -6,6 +6,7 @@ import {
   refreshStaleSources,
 } from "@/services/live/refresh";
 import { resolveAgentModelFallback } from "@/lib/agent/model";
+import { adminUnauthorizedResponse, isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isAdminAuthorized(request)) {
+    return adminUnauthorizedResponse();
+  }
   try {
     const body = await request.json().catch(() => ({}));
     const mode = body.mode as "all" | "stale" | "selected" | undefined;

@@ -18,6 +18,12 @@ import {
   WISCONSIN_BOUNDS,
   WISCONSIN_CENTER,
 } from "@/lib/map-styles";
+import { getCountiesGeoJson } from "@/lib/wi-counties-geojson";
+import { buildChoroplethExpression, fipsValuesFromCountyIds } from "./map-legend";
+
+const COUNTIES_SOURCE = "wi-counties";
+const COUNTIES_FILL = "wi-counties-fill";
+const COUNTIES_LINE = "wi-counties-line";
 
 export default function RealMap({
   center = WISCONSIN_CENTER,
@@ -26,6 +32,8 @@ export default function RealMap({
   className,
   onMarkerClick,
   showControls = true,
+  choroplethMetric = null,
+  choroplethValues = {},
 }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -61,6 +69,54 @@ export default function RealMap({
     });
   }, [markers, onMarkerClick]);
 
+  const applyChoropleth = useCallback(
+    (map: MapLibreMap) => {
+      if (!map.getLayer(COUNTIES_FILL) || !choroplethMetric) return;
+      if (Object.keys(choroplethValues).length === 0) return;
+      const fipsValues = fipsValuesFromCountyIds(choroplethValues);
+      const expr = buildChoroplethExpression(
+        choroplethMetric,
+        fipsValues,
+        darkMode ? "#1a2438" : "#b8c8d8"
+      );
+      map.setPaintProperty(COUNTIES_FILL, "fill-color", expr);
+      map.setPaintProperty(COUNTIES_FILL, "fill-opacity", 0.82);
+    },
+    [choroplethMetric, choroplethValues, darkMode]
+  );
+
+  const ensureCountyLayers = useCallback(
+    async (map: MapLibreMap) => {
+      const geo = await getCountiesGeoJson();
+      if (!map.getSource(COUNTIES_SOURCE)) {
+        map.addSource(COUNTIES_SOURCE, { type: "geojson", data: geo, promoteId: "fips" });
+      }
+      if (!map.getLayer(COUNTIES_FILL)) {
+        map.addLayer({
+          id: COUNTIES_FILL,
+          type: "fill",
+          source: COUNTIES_SOURCE,
+          paint: {
+            "fill-color": darkMode ? "#1a2438" : "#d5e0ea",
+            "fill-opacity": 0.45,
+          },
+        });
+        map.addLayer({
+          id: COUNTIES_LINE,
+          type: "line",
+          source: COUNTIES_SOURCE,
+          paint: {
+            "line-color": darkMode ? "#94a3b8" : "#64748b",
+            "line-width": 0.7,
+            "line-opacity": 0.85,
+          },
+        });
+      }
+      applyChoropleth(map);
+    },
+    [applyChoropleth, darkMode]
+  );
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -79,7 +135,10 @@ export default function RealMap({
       map.addControl(new NavigationControl(), "top-right");
     }
 
-    map.on("load", updateMarkers);
+    map.on("load", () => {
+      void ensureCountyLayers(map);
+      updateMarkers();
+    });
     mapRef.current = map;
 
     return () => {
@@ -102,12 +161,21 @@ export default function RealMap({
       ? getMapStyleUrl("streets", darkMode)
       : getRasterBasemapStyle("streets", darkMode);
     map.setStyle(next);
-    map.once("idle", updateMarkers);
-  }, [darkMode, updateMarkers]);
+    map.once("idle", () => {
+      void ensureCountyLayers(map);
+      updateMarkers();
+    });
+  }, [darkMode, updateMarkers, ensureCountyLayers]);
 
   useEffect(() => {
     updateMarkers();
   }, [updateMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    applyChoropleth(map);
+  }, [applyChoropleth]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -1,18 +1,29 @@
 import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
-import { fipsToSlug, WI_COUNTIES } from "@/lib/wi-counties";
-import { FIPS_TO_COUNTY_SHORT_NAME } from "@/lib/wi-county-fips";
+import { countyIdFromFips, WI_COUNTIES } from "@/lib/wi-counties";
 import { WI_COUNTY_CENTROIDS } from "@/data/wi-county-centroids";
 
-/** Stable county id for API lookups — featured metros use short ids; others use kebab slug. */
-export function countyIdFromFips(fips: string): string {
-  const featured = fipsToSlug(fips);
-  if (featured) return featured;
-  const short = FIPS_TO_COUNTY_SHORT_NAME[fips];
-  if (!short) return fips;
-  return short
-    .toLowerCase()
-    .replace(/\./g, "")
-    .replace(/\s+/g, "-");
+export { countyIdFromFips } from "@/lib/wi-counties";
+
+export type CountyRecord = {
+  id: string;
+  name: string;
+  fips: string;
+  lat: number;
+  lng: number;
+};
+
+/** All 72 Wisconsin counties with centroids. */
+export function allCountyRecords(): CountyRecord[] {
+  return Object.entries(WI_COUNTY_NAME_TO_FIPS).map(([name, fips]) => {
+    const c = WI_COUNTY_CENTROIDS[fips];
+    return {
+      id: countyIdFromFips(fips),
+      name,
+      fips,
+      lat: c?.lat ?? 44.5,
+      lng: c?.lng ?? -89.5,
+    };
+  });
 }
 
 export function countyDisplayName(name: string): string {

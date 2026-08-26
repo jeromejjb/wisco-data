@@ -20,7 +20,7 @@ const HistoryLine = memo(function HistoryLine({ message }: { message: WorkwaysAg
   const text = isUser ? raw : formatAssistantChatText(raw);
   if (!text.trim()) return null;
   return (
-    <p className={cn("text-[12px] leading-relaxed", isUser ? "text-[#1e6b9c]" : "text-[#3d4659]")}>
+    <p className={cn("text-[12px] leading-relaxed", isUser ? "text-[#1e6b9c] dark:text-[#4da3d4]" : "text-[#3d4659] dark:text-[#c5cddb]")}>
       <span className="font-semibold">{isUser ? "You" : "AI"}:</span> {text}
     </p>
   );
@@ -156,10 +156,10 @@ export function MapChatWidget() {
       <motion.div
         layout
         className={cn(
-          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/[0.96] shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300",
+          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/[0.96] shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300 dark:bg-[#0f1524]/[0.94]",
           focused
             ? "border-[#1e6b9c]/25 shadow-[var(--shadow-dock-focus)]"
-            : "border-white/70"
+            : "border-white/70 dark:border-white/10"
         )}
       >
         <LocalPromptBar
@@ -176,7 +176,7 @@ export function MapChatWidget() {
         />
 
         {showHistory && messages.length > 0 && (
-          <div className="max-h-[180px] space-y-2 overflow-y-auto border-t border-black/[0.05] px-4 py-3">
+          <div className="max-h-[180px] space-y-2 overflow-y-auto border-t border-black/[0.05] px-4 py-3 dark:border-white/10">
             {messages.map((m) => (
               <HistoryLine key={m.id} message={m} />
             ))}

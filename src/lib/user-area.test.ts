@@ -42,9 +42,9 @@ describe("nearestCountyFromCoords", () => {
     expect(nearest.countyId).toBe("milwaukee");
   });
 
-  it("returns the nearest featured metro to western Wisconsin coords", () => {
+  it("returns the nearest county to western Wisconsin coords", () => {
     const nearest = nearestCountyFromCoords({ lat: 43.8014, lng: -91.2396 });
-    expect(nearest.countyId).toBe("eau-claire");
+    expect(nearest.countyId).toBe("la-crosse");
   });
 });
 
@@ -95,5 +95,6 @@ describe("userAreaFromCountyId", () => {
 
   it("falls back to default for unknown ids", () => {
     expect(userAreaFromCountyId("totally-unknown")).toEqual(DEFAULT_USER_AREA);
+    expect(DEFAULT_USER_AREA.countyId).toBe("statewide");
   });
 });

@@ -9,10 +9,21 @@ import {
 } from "@/lib/agent/model";
 import { encodeAgentFailure } from "@/lib/rate-limit-messages";
 import { refreshStaleSources } from "@/services/live/refresh";
+import { clientIp, consumeIpRateLimit } from "@/lib/ip-rate-limit";
 import type { UserArea } from "@/lib/user-area";
 import type { AreaNewsItem } from "@/lib/agent/chat-starters";
 
 export const maxDuration = 60;
+
+let lastStaleRefreshAt = 0;
+const STALE_REFRESH_DEBOUNCE_MS = 5 * 60_000;
+
+function maybeRefreshStaleSources() {
+  const now = Date.now();
+  if (now - lastStaleRefreshAt < STALE_REFRESH_DEBOUNCE_MS) return;
+  lastStaleRefreshAt = now;
+  refreshStaleSources().catch((e) => console.warn("Agent pre-refresh:", e));
+}
 
 /** Warm stale feeds before agent sessions */
 export async function GET() {
@@ -37,19 +48,38 @@ export async function POST(req: Request) {
     );
   }
 
-  // Background refresh of stale sources when agent is invoked
-  refreshStaleSources().catch((e) => console.warn("Agent pre-refresh:", e));
+  const limit = consumeIpRateLimit(clientIp(req), 30, 10 * 60_000);
+  if (!limit.ok) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Try again in a few minutes." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(limit.retryAfterSec),
+        },
+      }
+    );
+  }
 
-  const body = await req.json();
-  const { messages, userArea, localNews, areaSentiment } = body as {
+  maybeRefreshStaleSources();
+
+  let body: {
     messages: unknown;
     userArea?: UserArea;
     localNews?: AreaNewsItem[];
     areaSentiment?: import("@/lib/news-types").AreaSentimentSnapshot | null;
   };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { messages, userArea, localNews, areaSentiment } = body;
 
   const contextLines: string[] = [];
-  if (userArea?.displayName) {
+  if (userArea?.displayName && userArea.countyId !== "statewide") {
     contextLines.push(
       `## User location context`,
       `The user is near **${userArea.displayName}**, Wisconsin (detected via ${userArea.source}).`,
@@ -69,8 +99,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Use a wrapped model that hops to a free Gemini/OpenAI model in this same
-  // request when the primary is out of credits — instead of waiting on retries.
   const chosen = resolveAgentModelFallback();
   const agent = createWorkwaysAgent(
     contextLines.length ? contextLines.join("\n") : undefined,
@@ -88,8 +116,6 @@ export async function POST(req: Request) {
     onError: (error) => {
       const raw = error instanceof Error ? error.message : String(error);
       console.error(`Agent stream failed [${chosen.provider}/${chosen.modelId}]:`, raw);
-      // Cool the exhausted model down so the next request rotates to a free
-      // fallback instead of hitting the same wall.
       const until = failureCooldownFromRaw(raw);
       if (until !== null) markModelCooldown(chosen.modelId, until);
       return encodeAgentFailure(raw);

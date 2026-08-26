@@ -14,11 +14,10 @@ export const TECH_STACK = [
   { name: "Tailwind CSS", detail: "Design system" },
   { name: "Vercel AI SDK", detail: "Map agent" },
   { name: "Gemini", detail: "Optional AI answers" },
-  { name: "Prisma", detail: "Experiments & prompts" },
-  { name: "Zustand", detail: "Map session state" },
+  { name: "Zustand", detail: "Saved places, theme, and map session" },
   { name: "SWR", detail: "Live data fetching" },
   { name: "Framer Motion", detail: "Motion & transitions" },
-  { name: "GTFS", detail: "MCTS & Madison Metro" },
+  { name: "GTFS", detail: "Wisconsin transit agency feeds" },
 ] as const;
 
 export type SiteDataSource = {

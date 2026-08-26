@@ -34,6 +34,14 @@ export function EmptyState({
   );
 }
 
+export function SampleDataBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-6 rounded-2xl border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+      {children}
+    </div>
+  );
+}
+
 export function DataFreshness({
   source,
   lastUpdated,
