@@ -7,7 +7,9 @@ export function isRateLimitError(message: string): boolean {
     lower.includes("429") ||
     lower.includes("rate limit") ||
     lower.includes("too many requests") ||
-    lower.includes("quota")
+    lower.includes("quota") ||
+    lower.includes("resource_exhausted") ||
+    lower.includes("insufficient_quota")
   );
 }
 
@@ -67,9 +69,9 @@ export function decodeAgentFailure(
 
 export function agentDailyQuotaCopy(): { title: string; detail: string } {
   return {
-    title: "Assistant is out of AI credits for today",
+    title: "Today's free AI allowance is used up",
     detail:
-      "The free daily AI allowance is used up — it resets tomorrow. Everything below is live map and jobs data, which still works normally.",
+      "It refreshes tomorrow — and meanwhile every answer still pulls live Wisconsin data: the map, jobs, and county numbers below keep working just the same.",
   };
 }
 
@@ -89,8 +91,8 @@ export function agentRateLimitCopy(errorMessage?: string): {
   const window = formatRetryWindow(retryAfterMinutes);
 
   return {
-    title: "AI assistant paused briefly",
-    detail: `We've hit a temporary usage limit — nothing is broken. It usually clears on its own; try again in ${window}. Live map data is still available below.`,
+    title: "AI is taking a quick breath",
+    detail: `Free usage limits recharge on their own — full AI answers are back in ${window}. Nothing else skips a beat: the live map, jobs, and county data below are all still working.`,
     retryAfterMinutes,
   };
 }

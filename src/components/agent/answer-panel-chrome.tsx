@@ -13,7 +13,7 @@ export function AnswerSectionHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("relative z-10 flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3", className)}>
+    <div className={cn("relative z-10 flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3", className)}>
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="accent-bar-glow h-4 w-0.5 shrink-0 rounded-full bg-gradient-to-b from-cyan-300 to-[#1e6b9c]" aria-hidden />
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-white/90">
@@ -35,9 +35,15 @@ export function AnswerCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border border-white/12 bg-[#0c1222]/92 shadow-[0_16px_56px_rgba(12,18,34,0.42)] backdrop-blur-xl",
-        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-28 before:bg-gradient-to-b before:from-cyan-400/[0.08] before:via-transparent before:to-transparent",
-        "after:pointer-events-none after:absolute after:-right-10 after:-top-10 after:h-32 after:w-32 after:rounded-full after:bg-cyan-400/10 after:blur-3xl",
+        // Floating glass slab: no hard border — hairline rim light + layered
+        // contact/ambient shadows make it levitate over the map.
+        // 8-digit hex alpha (no /modifier) so opacity can never misparse.
+        "relative overflow-hidden rounded-[24px] bg-[#0e1626f5]",
+        "ring-1 ring-inset ring-white/10",
+        "shadow-[0_2px_6px_rgba(4,8,18,0.25),0_18px_44px_-8px_rgba(4,8,18,0.48),0_44px_90px_-18px_rgba(4,8,18,0.42)]",
+        "backdrop-blur-2xl saturate-[1.15]",
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-gradient-to-b before:from-white/5 before:to-transparent",
+        "after:pointer-events-none after:absolute after:-right-12 after:-top-12 after:h-36 after:w-36 after:rounded-full after:bg-cyan-400/10 after:blur-3xl",
         className
       )}
     >

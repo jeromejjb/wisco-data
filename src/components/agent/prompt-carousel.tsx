@@ -18,6 +18,9 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [paused, setPaused] = useState(false);
+  // Touch pause: auto-advance must not swap the pill between touchstart and
+  // tap on mobile, or the user sends a different prompt than the one they saw.
+  const [touchPaused, setTouchPaused] = useState(false);
 
   const count = starters.length;
   const current = starters[index];
@@ -37,10 +40,16 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
   }, [starters.map((s) => s.id).join("|")]);
 
   useEffect(() => {
-    if (paused || disabled || count <= 1) return;
+    if (!touchPaused) return;
+    const resume = window.setTimeout(() => setTouchPaused(false), 6000);
+    return () => window.clearTimeout(resume);
+  }, [touchPaused]);
+
+  useEffect(() => {
+    if (paused || touchPaused || disabled || count <= 1) return;
     const timer = window.setInterval(() => go(1), AUTO_ADVANCE_MS);
     return () => window.clearInterval(timer);
-  }, [paused, disabled, count, go]);
+  }, [paused, touchPaused, disabled, count, go]);
 
   if (!count || !current) return null;
 
@@ -69,12 +78,13 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
+      onTouchStart={() => setTouchPaused(true)}
     >
       {count > 1 && (
         <CarouselNav direction="prev" onClick={() => go(-1)} disabled={disabled} />
       )}
 
-      <div className="relative mx-0.5 h-7 min-w-0 flex-1 overflow-hidden sm:h-8">
+      <div className="relative mx-0.5 min-w-0 flex-1 overflow-hidden rounded-full">
         <AnimatePresence custom={direction} mode="wait" initial={false}>
           <motion.button
             key={current.id}
@@ -96,7 +106,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
             onClick={() => onPick(current)}
             title={current.text}
             className={cn(
-              "absolute inset-0 flex w-full items-center justify-center gap-1.5 rounded-full px-3 disabled:opacity-50",
+              "flex min-h-[28px] w-full items-center justify-center gap-1.5 rounded-full px-3 py-1 sm:min-h-[32px] disabled:opacity-50",
               current.kind === "news"
                 ? "bg-amber-50/90 text-[11px] font-medium text-amber-950 ring-1 ring-amber-200/60"
                 : "bg-[#f4f6f9]/95 text-[11px] font-medium text-[#2a3344] ring-1 ring-black/[0.05] sm:text-[12px]"
@@ -107,7 +117,7 @@ export function PromptCarousel({ starters, onPick, disabled }: PromptCarouselPro
             ) : (
               <Sparkles className="h-3 w-3 shrink-0 text-[#1e6b9c]/70" aria-hidden />
             )}
-            <span className="truncate">{starterDisplayText(current)}</span>
+            <span className="whitespace-nowrap leading-tight">{starterDisplayText(current)}</span>
           </motion.button>
         </AnimatePresence>
       </div>

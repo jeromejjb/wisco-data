@@ -32,7 +32,31 @@ export function MapChatWidget() {
   const [showHistory, setShowHistory] = useState(false);
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const { pendingPrompt, consumePendingPrompt } = useAgentShell();
+
+  // Publish the dock's live total height (loader + banners + safe padding) as a
+  // CSS var so bottom sheets (county panel) anchor to reality instead of a
+  // static guess — static offsets let content slide under the translucent dock.
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const setVar = () => {
+      document.documentElement.style.setProperty(
+        "--dock-total",
+        `${Math.ceil(el.getBoundingClientRect().height)}px`
+      );
+    };
+    setVar();
+    const observer = new ResizeObserver(setVar);
+    observer.observe(el);
+    window.addEventListener("orientationchange", setVar);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", setVar);
+      document.documentElement.style.removeProperty("--dock-total");
+    };
+  }, []);
 
   const {
     messages,
@@ -108,6 +132,7 @@ export function MapChatWidget() {
 
   return (
     <motion.div
+      ref={shellRef}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 380, damping: 34, delay: 0.15 }}
@@ -131,7 +156,7 @@ export function MapChatWidget() {
       <motion.div
         layout
         className={cn(
-          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/90 shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300",
+          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/[0.96] shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300",
           focused
             ? "border-[#1e6b9c]/25 shadow-[var(--shadow-dock-focus)]"
             : "border-white/70"
@@ -170,9 +195,9 @@ export function MapChatWidget() {
               <p className="mt-0.5 text-[11px] leading-snug text-amber-900/75">
                 {agentErrorInfo.detail}
               </p>
-              {agentErrorInfo.isRateLimited && agentErrorInfo.retryAfterMinutes && (
+              {agentErrorInfo.isRateLimited && (
                 <p className="mt-1 text-[10px] text-amber-800/60">
-                  Usually resolves within {agentErrorInfo.retryAfterMinutes} min — no action needed.
+                  No action needed — your next question runs automatically.
                 </p>
               )}
             </motion.div>
@@ -217,7 +242,8 @@ export function MapChatWidget() {
             readOnly={isLoading}
             rows={1}
             className={cn(
-              "map-ask-input max-h-[88px] min-h-[24px] w-full resize-none border-0 bg-transparent py-1 pr-11 text-[15px] leading-snug text-[#0c1222] shadow-none outline-none ring-0 placeholder:text-[#9aa3b5] focus:outline-none focus:ring-0 read-only:cursor-default read-only:opacity-60",
+              // text-base keeps iOS Safari from zooming the viewport on focus (<16px triggers auto-zoom)
+              "map-ask-input max-h-[88px] min-h-[24px] w-full resize-none border-0 bg-transparent py-1 pr-11 text-base leading-snug text-[#0c1222] shadow-none outline-none ring-0 placeholder:text-[#9aa3b5] focus:outline-none focus:ring-0 read-only:cursor-default read-only:opacity-60 sm:text-[15px]",
               messages.length > 0 ? "pl-9" : "pl-0.5"
             )}
           />

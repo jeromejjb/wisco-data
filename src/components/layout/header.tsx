@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Moon, Sun, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store";
@@ -92,25 +93,34 @@ export function Header() {
         <GlobalSearch compact />
       </div>
 
-      {mobileOpen && (
-        <nav className="border-t border-border bg-background/95 px-4 py-4 backdrop-blur-xl lg:hidden">
-          <div className="flex flex-col gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "rounded-xl px-4 py-3.5 text-sm font-medium transition-colors",
-                  pathname === item.href ? "bg-lake-600/10 text-lake-700" : "hover:bg-muted"
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      )}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.nav
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            className="overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
+            aria-label="Mobile"
+          >
+            <div className="flex flex-col gap-1 px-4 py-4">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "rounded-xl px-4 py-3.5 text-sm font-medium transition-colors",
+                    pathname === item.href ? "bg-lake-600/10 text-lake-700" : "hover:bg-muted"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </motion.nav>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

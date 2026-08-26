@@ -96,8 +96,8 @@ export function MapJobResultsPanel({ result, className }: MapJobResultsPanelProp
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-[13px] font-semibold text-white">{job.title}</p>
-                          <p className="truncate text-[11px] text-white/50">
+                          <p className="text-[13px] font-semibold leading-snug text-white">{job.title}</p>
+                          <p className="text-[11px] leading-snug text-white/50">
                             {job.employer}
                             <span className="text-white/30"> · </span>
                             {job.city}

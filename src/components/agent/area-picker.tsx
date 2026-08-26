@@ -134,7 +134,7 @@ export function AreaPicker({ area, loading, loadingLabel, className, compact }: 
         ) : (
           <MapPin className="h-3 w-3 shrink-0 text-[#1e6b9c]" />
         )}
-        <span className="truncate">{loading && loadingLabel ? loadingLabel : label}</span>
+        <span className="text-left leading-tight">{loading && loadingLabel ? loadingLabel : label}</span>
         {!loading && (
           <ChevronDown
             className={cn("h-3 w-3 shrink-0 text-[#1e6b9c]/70 transition-transform", open && "rotate-180")}

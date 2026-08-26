@@ -1,7 +1,7 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { cached } from "@/lib/cache";
-import { hasAgentCredentials, resolveAgentModel } from "@/lib/agent/model";
+import { hasAgentCredentials, resolveAgentLanguageModel } from "@/lib/agent/model";
 import type { AreaNewsItem, AreaSentimentSnapshot, NewsTone } from "@/lib/news-types";
 import type { UserArea } from "@/lib/user-area";
 
@@ -64,14 +64,14 @@ export async function analyzeAreaSentiment(
     }
 
     try {
-      const { model } = resolveAgentModel();
       const headlines = items
         .slice(0, 6)
         .map((i, n) => `${n + 1}. ${i.title}${i.summary ? ` — ${i.summary.slice(0, 100)}` : ""}`)
         .join("\n");
 
       const { object } = await generateObject({
-        model,
+        model: resolveAgentLanguageModel(),
+        maxRetries: 0,
         schema: SentimentSchema,
         prompt: `You analyze local news sentiment for Wisconsin workforce/economy context.
 

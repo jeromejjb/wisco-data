@@ -1,7 +1,7 @@
-import { ToolLoopAgent, tool, stepCountIs } from "ai";
+import { ToolLoopAgent, tool, stepCountIs, type LanguageModel } from "ai";
 import { z } from "zod";
 import { WORKWAYS_SYSTEM_PROMPT } from "./system-prompt";
-import { resolveAgentModel } from "./model";
+import { resolveAgentLanguageModel, resolveAgentModelFallback } from "./model";
 import type { ToolResultWithMap, ChoroplethMetric } from "./map-actions";
 import { getLiveEconomyData } from "@/services/live/economy";
 import { getLiveJobs } from "@/services/live/jobs";
@@ -63,8 +63,8 @@ export function resolveCountyId(input: string): string | undefined {
   return countyIdsFromText(input)[0];
 }
 
-function getModel() {
-  return resolveAgentModel().model;
+function getModel(explicit?: LanguageModel) {
+  return explicit ?? resolveAgentLanguageModel();
 }
 
 export const workwaysTools = {
@@ -74,7 +74,7 @@ export const workwaysTools = {
     inputSchema: z.object({}),
     execute: async () => {
       const statuses = getDataSourceStatuses();
-      const { provider, modelId } = resolveAgentModel();
+      const { provider, modelId } = resolveAgentModelFallback();
       const stale = statuses.filter((s) => s.configured && (s.stale || !s.lastFetchedAt));
       return {
         summary: `${statuses.filter((s) => s.configured).length} sources configured, ${stale.length} stale`,
@@ -466,9 +466,11 @@ export const workwaysTools = {
   }),
 };
 
-export function createWorkwaysAgent(extraInstructions?: string) {
+export function createWorkwaysAgent(extraInstructions?: string, explicitModel?: LanguageModel) {
   return new ToolLoopAgent({
-    model: getModel(),
+    model: getModel(explicitModel),
+    // Don't sit on an exhausted model's retry-after (often ~45s). Fail over to a free model instead.
+    maxRetries: 0,
     instructions: extraInstructions
       ? `${WORKWAYS_SYSTEM_PROMPT}\n\n${extraInstructions}`
       : WORKWAYS_SYSTEM_PROMPT,

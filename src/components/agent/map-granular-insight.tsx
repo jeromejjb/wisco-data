@@ -142,13 +142,13 @@ export function MapGranularInsight({ focus, className }: MapGranularInsightProps
                         peer.id === focusFips ||
                         peer.name === focus.countyName;
                       return (
-                        <li key={peer.id} className="grid grid-cols-[1.125rem_3.5rem_1fr_2.5rem] items-center gap-2">
+                        <li key={peer.id} className="grid grid-cols-[1.125rem_4.5rem_1fr_2.5rem] items-center gap-2">
                           <span className="text-[9px] font-bold tabular-nums text-white/30">
                             {i + 1}
                           </span>
                           <span
                             className={cn(
-                              "truncate text-[10px] font-medium leading-tight",
+                              "text-[10px] font-medium leading-tight",
                               isFocus ? "text-cyan-300" : "text-white/60"
                             )}
                             title={peer.name}
