@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { branchName, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
+import { branchName, isActionsCreatePrDenied, issueNumberFromBranch, prAlreadyExistsUrl, prBody, prTitleFromSubjects, shouldStartFeature, slugify } from "../../scripts/feature-branch-lib.mjs";
 
 describe("slugify", () => {
   it("builds a short git-safe slug", () => {
@@ -90,5 +90,16 @@ describe("prAlreadyExistsUrl", () => {
     expect(prAlreadyExistsUrl(stderr)).toBe(
       "https://github.com/jeromejjb/wisco-data/pull/40"
     );
+  });
+});
+
+describe("isActionsCreatePrDenied", () => {
+  it("detects the default GITHUB_TOKEN restriction", () => {
+    expect(
+      isActionsCreatePrDenied(
+        "pull request create failed: GraphQL: GitHub Actions is not permitted to create or approve pull requests (createPullRequest)\n"
+      )
+    ).toBe(true);
+    expect(isActionsCreatePrDenied("already exists")).toBe(false);
   });
 });

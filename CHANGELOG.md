@@ -19,6 +19,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Pushing to an `issue/{n}-…` branch with no open PR now opens one into `main` automatically.
 - Night-shift workflow (every 8 hours): files the next catalog improvement as a GitHub issue and, when `CURSOR_API_KEY` is set, starts a Cursor cloud agent that opens a PR for approval.
 
+### Fixed
+
+- Ensure-PR job explains when GitHub Actions is blocked from opening pull requests, instead of dumping a Node stack trace.
+
 ### Changed
 
 - Feature work starts as a GitHub issue, then a dedicated `issue/{n}-…` branch and pull request into `main`. Pushing more work to that branch without an open PR opens one automatically.

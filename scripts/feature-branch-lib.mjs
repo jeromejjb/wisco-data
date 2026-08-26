@@ -80,3 +80,10 @@ export function prAlreadyExistsUrl(stderr) {
   );
   return match ? match[1] : null;
 }
+
+/** Default GITHUB_TOKEN cannot open PRs unless the repo allows it. */
+export function isActionsCreatePrDenied(stderr) {
+  return /GitHub Actions is not permitted to create or approve pull requests/i.test(
+    String(stderr ?? "")
+  );
+}

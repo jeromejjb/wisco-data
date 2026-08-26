@@ -2,6 +2,8 @@ name: Ensure pull request
 
 # If work lands on an issue/* branch with no open PR into main, open one.
 # Covers follow-up commits after the first PR for that branch already merged.
+# Requires Settings → Actions → General → “Allow GitHub Actions to create and
+# approve pull requests”, or a PAT in secrets.PR_GITHUB_TOKEN.
 
 on:
   push:
@@ -27,6 +29,6 @@ jobs:
           node-version: 20
       - name: Ensure pull request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PR_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: node scripts/ensure-pr.mjs
