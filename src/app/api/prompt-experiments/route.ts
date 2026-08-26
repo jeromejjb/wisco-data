@@ -1,3 +1,4 @@
+import { adminUnauthorizedResponse, isAdminAuthorized } from "@/lib/admin-auth";
 import { NextRequest, NextResponse } from "next/server";
 import {
   getExperimentDashboardPayload,
@@ -7,12 +8,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function isAuthorized(req: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return true;
-  const header = req.headers.get("authorization");
-  const query = req.nextUrl.searchParams.get("key");
-  return header === `Bearer ${secret}` || query === secret;
+function authorized(req: NextRequest): boolean {
+  return isAdminAuthorized(req);
 }
 
 export async function POST(req: NextRequest) {
@@ -29,8 +26,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!authorized(req)) {
+    return adminUnauthorizedResponse();
   }
 
   return NextResponse.json({

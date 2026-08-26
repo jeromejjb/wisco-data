@@ -44,7 +44,7 @@ export function MapAreaSentiment({ className }: MapAreaSentimentProps) {
                   Local headline
                   {headline.countyName ? ` · ${headline.countyName}` : ""}
                 </p>
-                <p className="mt-0.5 line-clamp-2 text-[12px] font-medium leading-snug text-[#2a3344] dark:text-white/90">
+                <p className="mt-0.5 text-[12px] font-medium leading-snug text-[#2a3344] dark:text-white/90">
                   {headline.headline}
                 </p>
                 <p className="mt-1 text-[10px] text-[#8b95a8]">

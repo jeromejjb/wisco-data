@@ -139,7 +139,12 @@ export async function fetchGtfsStops(
 ): Promise<{ stops: GtfsStop[]; routes: GtfsRoute[] }> {
   const limit = opts?.limit ?? 400;
   const bboxKey = opts?.bbox
-    ? `${opts.bbox.minLat},${opts.bbox.maxLat},${opts.bbox.minLng},${opts.bbox.maxLng}`
+    ? [
+        opts.bbox.minLat.toFixed(2),
+        opts.bbox.maxLat.toFixed(2),
+        opts.bbox.minLng.toFixed(2),
+        opts.bbox.maxLng.toFixed(2),
+      ].join(",")
     : "all";
   const cacheKey = `gtfs:stops:v2:${agencyId}:${limit}:${bboxKey}`;
 
@@ -201,7 +206,12 @@ export async function fetchGtfsRouteShapes(
 ): Promise<TransitRouteShape[]> {
   const maxRoutes = opts?.maxRoutes ?? 40;
   const bboxKey = opts?.bbox
-    ? `${opts.bbox.minLat},${opts.bbox.maxLat},${opts.bbox.minLng},${opts.bbox.maxLng}`
+    ? [
+        opts.bbox.minLat.toFixed(2),
+        opts.bbox.maxLat.toFixed(2),
+        opts.bbox.minLng.toFixed(2),
+        opts.bbox.maxLng.toFixed(2),
+      ].join(",")
     : "all";
   const cacheKey = `gtfs:shapes:v2:${agencyId}:${maxRoutes}:${bboxKey}`;
 
@@ -397,7 +407,7 @@ export async function fetchTransitMapLayers(input: {
 
   await Promise.all(
     agencyIds.map(async (agencyId) => {
-      const [stopData, shapeData, rt] = await Promise.all([
+      const [stopData, shapeData, rt] = await Promise.allSettled([
         fetchGtfsStops(agencyId, { limit: 500, bbox: input.bbox }),
         input.includeShapes !== false
           ? fetchGtfsRouteShapes(agencyId, { bbox: input.bbox, maxRoutes: 35 })
@@ -407,11 +417,15 @@ export async function fetchTransitMapLayers(input: {
           : Promise.resolve({ vehicles: [], alerts: [] }),
       ]);
 
-      stops.push(...stopData.stops);
-      routes.push(...stopData.routes);
-      shapes.push(...shapeData);
-      vehicles.push(...rt.vehicles);
-      alerts.push(...rt.alerts);
+      if (stopData.status === "fulfilled") {
+        stops.push(...stopData.value.stops);
+        routes.push(...stopData.value.routes);
+      }
+      if (shapeData.status === "fulfilled") shapes.push(...shapeData.value);
+      if (rt.status === "fulfilled") {
+        vehicles.push(...rt.value.vehicles);
+        alerts.push(...rt.value.alerts);
+      }
     })
   );
 

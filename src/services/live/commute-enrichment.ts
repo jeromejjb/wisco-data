@@ -1,6 +1,8 @@
 import type { Job, CommuteSummary } from "@/lib/types";
 import { driveMinutesFromKm } from "@/lib/commute-policy";
 import { fetchGtfsStops } from "@/services/clients/gtfs";
+import { agencyByCounty, type TransitAgencyId } from "@/lib/transit-agencies";
+import { countyIdsFromText } from "@/lib/county-lookup";
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
@@ -29,29 +31,19 @@ function nearestStopDistanceKm(
   return best;
 }
 
-function isTransitMetroCity(city: string): boolean {
-  const c = city.toLowerCase();
-  return (
-    c.includes("milwaukee") ||
-    c.includes("madison") ||
-    c.includes("wauwatosa") ||
-    c.includes("west allis") ||
-    c.includes("verona") ||
-    c.includes("waukesha") ||
-    c.includes("greenfield") ||
-    c.includes("oak creek")
-  );
+function agencyIdForJob(job: Job): TransitAgencyId | undefined {
+  const [countyId] = countyIdsFromText(`${job.location.county} ${job.location.city}`);
+  if (countyId) {
+    const agency = agencyByCounty(countyId);
+    if (agency) return agency.id;
+  }
+  return undefined;
 }
 
 function estimateTransitCommute(
   job: Job,
-  mctsStops: { lat: number; lng: number }[],
-  madisonStops: { lat: number; lng: number }[]
+  stops: { lat: number; lng: number }[]
 ): CommuteSummary {
-  const city = job.location.city.toLowerCase();
-  const stops =
-    city.includes("madison") || city.includes("verona") ? madisonStops : mctsStops;
-
   const distKm = nearestStopDistanceKm(
     job.location.coordinates.lat,
     job.location.coordinates.lng,
@@ -80,7 +72,7 @@ function estimateTransitCommute(
     durationMinutes,
     walkMinutes,
     transfers,
-    fareEstimate: city.includes("madison") ? 2.0 : 2.25,
+    fareEstimate: 2.25,
     scheduleCompatible: durationMinutes < 50,
     reliability: transfers === 0 ? "high" : "medium",
     mode: "transit",
@@ -131,15 +123,24 @@ export async function enrichJobsWithCommuteEstimates(
 ): Promise<Job[]> {
   if (jobs.length === 0) return jobs;
 
-  const [{ stops: mctsStops }, { stops: madisonStops }] = await Promise.all([
-    fetchGtfsStops("mcts", { limit: 350 }),
-    fetchGtfsStops("madison", { limit: 250 }),
-  ]);
+  const agencyIds = [...new Set(jobs.map(agencyIdForJob).filter(Boolean))] as TransitAgencyId[];
+  const stopMap = new Map<TransitAgencyId, { lat: number; lng: number }[]>();
+
+  await Promise.all(
+    agencyIds.slice(0, 7).map(async (id) => {
+      const { stops } = await fetchGtfsStops(id, { limit: 350 });
+      stopMap.set(
+        id,
+        stops.map((s) => ({ lat: s.lat, lng: s.lng }))
+      );
+    })
+  );
 
   return jobs.map((job) => {
-    const inTransitMetro = isTransitMetroCity(job.location.city);
-    const commute = inTransitMetro
-      ? estimateTransitCommute(job, mctsStops, madisonStops)
+    const agencyId = agencyIdForJob(job);
+    const stops = agencyId ? stopMap.get(agencyId) ?? [] : [];
+    const commute = stops.length
+      ? estimateTransitCommute(job, stops)
       : options?.searchAnchor
         ? estimateDriveCommute(job, options.searchAnchor)
         : undefined;

@@ -73,7 +73,7 @@ export function MapBizJournalPanel({ stories, areaLabel }: MapBizJournalPanelPro
                 <p className="mt-1.5 text-[13px] font-medium leading-snug text-white">{story.title}</p>
               )}
               {story.summary && (
-                <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-white/50">
+                <p className="mt-1 text-[11px] leading-relaxed text-white/50">
                   {story.summary}
                 </p>
               )}

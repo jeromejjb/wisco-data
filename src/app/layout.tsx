@@ -1,4 +1,5 @@
 import { DM_Sans, Geist_Mono, Instrument_Sans } from "next/font/google";
+import type { Viewport } from "next";
 import { ConditionalHeader } from "@/components/layout/conditional-header";
 import { ConditionalFooter } from "@/components/layout/conditional-footer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
@@ -30,6 +31,18 @@ export const metadata = {
   },
   description:
     "Explore Wisconsin jobs, local economics, and public-transit routes that connect people to work.",
+};
+
+// viewportFit: "cover" is required for env(safe-area-inset-*) to resolve on
+// notched iPhones — the workspace dock and answer sheets pad with those values.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7f5f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#070b14" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

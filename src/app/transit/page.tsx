@@ -34,12 +34,17 @@ function TransitContent() {
   const searchParams = useSearchParams();
   const agencyParam = searchParams.get("agency");
   const destParam = searchParams.get("dest");
+  const jobParam = searchParams.get("job");
 
   const [agency, setAgency] = useState<TransitAgencyId | "all">(
-    agencyParam && isTransitAgencyId(agencyParam) ? agencyParam : "mcts"
+    agencyParam === "all"
+      ? "all"
+      : agencyParam && isTransitAgencyId(agencyParam)
+        ? agencyParam
+        : "mcts"
   );
   const [originInput, setOriginInput] = useState("Milwaukee Intermodal Station");
-  const [destInput, setDestInput] = useState(destParam ?? "9200 W Wisconsin Ave, Milwaukee, WI");
+  const [destInput, setDestInput] = useState(destParam ?? jobParam ?? "");
   const [selection, setSelection] = useState<TransitMapSelection | null>(null);
   const [layerToggles, setLayerToggles] = useState({ routes: true, stops: true, vehicles: true });
 
@@ -239,19 +244,29 @@ function TransitContent() {
 
             <div>
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="font-display text-lg font-bold">Trip options</h2>
-                <p className="text-xs text-muted-foreground">Scheduled estimates · router coming soon</p>
+                <h2 className="font-display text-lg font-bold">Trip planner</h2>
+                <p className="text-xs text-muted-foreground">Live map is GTFS — itineraries need a router</p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                {routes.map((route) => (
-                  <RouteCard
-                    key={route.id}
-                    route={route}
-                    selected={route.id === (selectedRouteId ?? routes[0]?.id)}
-                    onSelect={() => setSelectedRouteId(route.id)}
-                  />
-                ))}
-              </div>
+              {routes.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {routes.map((route) => (
+                    <RouteCard
+                      key={route.id}
+                      route={route}
+                      selected={route.id === (selectedRouteId ?? routes[0]?.id)}
+                      onSelect={() => setSelectedRouteId(route.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="glass-panel border-0">
+                  <CardContent className="pt-6 text-sm text-muted-foreground">
+                    Point-to-point trip cards are off until a transit router is connected. Use the map
+                    for live vehicles, stops, and route shapes
+                    {destInput ? ` toward ${destInput}` : ""}.
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {routes[0] && (

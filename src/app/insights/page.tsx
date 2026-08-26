@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, Download, Share2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DataFreshness } from "@/components/ui/states";
+import { DataFreshness, SampleDataBanner } from "@/components/ui/states";
 import { insightsAdapter } from "@/services/adapters";
 
 export default function InsightsPage() {
@@ -15,9 +15,15 @@ export default function InsightsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold lg:text-3xl">Insights</h1>
         <p className="mt-1 max-w-2xl text-muted-foreground">
-          Data-driven stories about Wisconsin jobs, transit access, and community investment.
+          Sample narratives about Wisconsin jobs, transit access, and community investment.
+          These stories are illustrative — not a live report.
         </p>
       </div>
+
+      <SampleDataBanner>
+        Insights on this page are <strong>sample copy</strong> for product exploration. They are not
+        generated from the live BLS / WisConomy feeds.
+      </SampleDataBanner>
 
       {featured && (
         <Card className="mb-10 overflow-hidden border-lake-600/30 bg-gradient-to-br from-lake-50/50 to-transparent dark:from-lake-900/20">
@@ -33,14 +39,6 @@ export default function InsightsPage() {
               source={featured.provenance.source}
               lastUpdated={featured.provenance.lastUpdated}
             />
-            <div className="mt-4 flex gap-3">
-              <button className="inline-flex items-center gap-2 text-sm font-medium text-lake-600 hover:underline">
-                <Download className="h-4 w-4" /> Download report card
-              </button>
-              <button className="inline-flex items-center gap-2 text-sm font-medium text-lake-600 hover:underline">
-                <Share2 className="h-4 w-4" /> Share
-              </button>
-            </div>
           </CardContent>
         </Card>
       )}

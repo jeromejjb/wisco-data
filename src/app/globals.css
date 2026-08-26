@@ -27,7 +27,6 @@
   --glow-lake: rgba(30, 107, 156, 0.15);
   --glow-forest: rgba(38, 122, 85, 0.12);
   --safe-pb: max(1rem, env(safe-area-inset-bottom, 0px));
-  --safe-bottom-dock: calc(7rem + env(safe-area-inset-bottom, 0px));
   --shadow-dock: 0 12px 48px rgba(12, 18, 34, 0.14), 0 2px 8px rgba(12, 18, 34, 0.06);
   --shadow-dock-focus: 0 16px 56px rgba(30, 107, 156, 0.18), 0 2px 8px rgba(12, 18, 34, 0.06);
 }
@@ -43,6 +42,8 @@
   --ring: #4da3d4;
   --glow-lake: rgba(77, 163, 212, 0.12);
   --glow-forest: rgba(38, 122, 85, 0.1);
+  --shadow-dock: 0 12px 48px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-dock-focus: 0 16px 56px rgba(30, 107, 156, 0.28), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
@@ -438,6 +439,20 @@ body {
   opacity: 0.85;
 }
 
+/* Small screens: keep map attribution and controls above the ask dock.
+   --dock-total is measured live by MapChatWidget (falls back until set). */
+@media (max-width: 639px) {
+  .map-canvas--immersive .maplibregl-ctrl-bottom-right {
+    margin: 0 12px calc(var(--dock-total, 150px) + 4px) 0;
+  }
+  .map-canvas--immersive .maplibregl-ctrl-bottom-left {
+    margin: 0 0 calc(var(--dock-total, 150px) + 4px) 12px;
+  }
+  .map-canvas--immersive .maplibregl-ctrl-attrib {
+    margin: 0 0 calc(var(--dock-total, 150px) - 14px) 8px;
+  }
+}
+
 .map-canvas--painted::before {
   content: "";
   pointer-events: none;
@@ -464,6 +479,16 @@ body {
     rgba(30, 107, 156, 0.08) 45%,
     transparent 70%
   );
+}
+
+/* Floating answer surface — invisible scrollbar so overflow never reads as
+   a scroll window. No fade masks: card edges stay crisp end-to-end. */
+.float-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.float-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 /* Geographic answer pin (Option C) */

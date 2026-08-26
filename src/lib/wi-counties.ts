@@ -1,3 +1,6 @@
+import { FIPS_TO_COUNTY_SHORT_NAME, WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
+
+/** Featured metros used by marketing/compare UI — not a complete county list. */
 export const WI_COUNTIES = [
   { id: "milwaukee", name: "Milwaukee County", fips: "55079", lat: 43.0389, lng: -87.9065 },
   { id: "dane", name: "Dane County", fips: "55025", lat: 43.0731, lng: -89.4012 },
@@ -11,17 +14,36 @@ export const WI_COUNTIES = [
   { id: "winnebago", name: "Winnebago County", fips: "55139", lat: 44.0853, lng: -88.6684 },
 ] as const;
 
+export function fipsToSlug(fips: string): string | undefined {
+  return WI_COUNTIES.find((c) => c.fips === fips)?.id;
+}
+
+/** Stable id for any of Wisconsin's 72 counties. */
+export function countyIdFromFips(fips: string): string {
+  const featured = fipsToSlug(fips);
+  if (featured) return featured;
+  const short = FIPS_TO_COUNTY_SHORT_NAME[fips];
+  if (!short) return fips;
+  return short
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "-");
+}
+
 export const FIPS_BY_COUNTY_ID: Record<string, string> = Object.fromEntries(
-  WI_COUNTIES.map((c) => [c.id, c.fips])
+  Object.entries(WI_COUNTY_NAME_TO_FIPS).map(([, fips]) => [countyIdFromFips(fips), fips])
 );
 
 export function countySlugFromName(name: string): string | undefined {
   const normalized = name.trim().toLowerCase();
-  return WI_COUNTIES.find(
+  const featured = WI_COUNTIES.find(
     (c) => c.name.toLowerCase() === normalized || normalized.startsWith(c.name.split(" ")[0].toLowerCase())
   )?.id;
-}
-
-export function fipsToSlug(fips: string): string | undefined {
-  return WI_COUNTIES.find((c) => c.fips === fips)?.id;
+  if (featured) return featured;
+  for (const [fullName, fips] of Object.entries(WI_COUNTY_NAME_TO_FIPS)) {
+    if (fullName.toLowerCase() === normalized || fullName.toLowerCase().startsWith(normalized)) {
+      return countyIdFromFips(fips);
+    }
+  }
+  return undefined;
 }

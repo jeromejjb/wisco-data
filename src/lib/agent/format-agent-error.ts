@@ -6,7 +6,14 @@ import {
   isRateLimitError,
 } from "@/lib/rate-limit-messages";
 
-export function formatAgentError(error: Error | undefined): {
+const ON_MAP = "Live Wisconsin data is on the map.";
+const ASK_MAP =
+  "The map still answers — try a county, jobs, wages, or transit.";
+
+export function formatAgentError(
+  error: Error | undefined,
+  opts?: { liveFallback?: boolean }
+): {
   title: string;
   detail: string;
   fallbackNote: string;
@@ -14,7 +21,7 @@ export function formatAgentError(error: Error | undefined): {
   isRateLimited?: boolean;
   retryAfterMinutes?: number;
 } {
-  const fallbackNote = "Live map data is shown below.";
+  const fallbackNote = opts?.liveFallback ? ON_MAP : ASK_MAP;
 
   if (!error) {
     return {
@@ -45,8 +52,10 @@ export function formatAgentError(error: Error | undefined): {
       };
     }
     return {
-      title: "AI assistant is resting",
-      detail: "It couldn't answer this one. The live map and jobs data below are unaffected — try again shortly.",
+      title: opts?.liveFallback ? "Live data answered on the map" : "Chat AI stepped aside",
+      detail: opts?.liveFallback
+        ? "The chat model hit a limit. County numbers, jobs, and transit on the map are live — not a canned reply."
+        : ASK_MAP,
       fallbackNote,
       canUseLiveData: true,
     };
@@ -61,8 +70,10 @@ export function formatAgentError(error: Error | undefined): {
 
   if (msg.includes("503") || msg.includes("api key") || msg.includes("credentials")) {
     return {
-      title: "AI assistant unavailable",
-      detail: "We're still pulling live Wisconsin data for you on the map.",
+      title: "Chat AI unavailable",
+      detail: opts?.liveFallback
+        ? "Live Wisconsin feeds still painted this answer on the map."
+        : ASK_MAP,
       fallbackNote,
       canUseLiveData: true,
     };
@@ -83,15 +94,19 @@ export function formatAgentError(error: Error | undefined): {
   if (msg.includes("network") || msg.includes("fetch")) {
     return {
       title: "Connection hiccup",
-      detail: "Check your network — we'll keep trying with live data sources.",
+      detail: opts?.liveFallback
+        ? "Chat dropped, but live map data is on the map."
+        : "Check your network — the map still loads public Wisconsin feeds.",
       fallbackNote,
       canUseLiveData: true,
     };
   }
 
   return {
-    title: "AI assistant is resting",
-    detail: "It couldn't answer this one. The live map and jobs data below are unaffected — try again shortly.",
+    title: opts?.liveFallback ? "Live data answered on the map" : "Chat AI stepped aside",
+    detail: opts?.liveFallback
+      ? "The chat model couldn't finish. What's on the map is live Wisconsin data."
+      : ASK_MAP,
     fallbackNote,
     canUseLiveData: true,
   };

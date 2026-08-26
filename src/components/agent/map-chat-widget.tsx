@@ -20,7 +20,7 @@ const HistoryLine = memo(function HistoryLine({ message }: { message: WorkwaysAg
   const text = isUser ? raw : formatAssistantChatText(raw);
   if (!text.trim()) return null;
   return (
-    <p className={cn("text-[12px] leading-relaxed", isUser ? "text-[#1e6b9c]" : "text-[#3d4659]")}>
+    <p className={cn("text-[12px] leading-relaxed", isUser ? "text-[#1e6b9c] dark:text-[#4da3d4]" : "text-[#3d4659] dark:text-[#c5cddb]")}>
       <span className="font-semibold">{isUser ? "You" : "AI"}:</span> {text}
     </p>
   );
@@ -32,7 +32,31 @@ export function MapChatWidget() {
   const [showHistory, setShowHistory] = useState(false);
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const { pendingPrompt, consumePendingPrompt } = useAgentShell();
+
+  // Publish the dock's live total height (loader + banners + safe padding) as a
+  // CSS var so bottom sheets (county panel) anchor to reality instead of a
+  // static guess — static offsets let content slide under the translucent dock.
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const setVar = () => {
+      document.documentElement.style.setProperty(
+        "--dock-total",
+        `${Math.ceil(el.getBoundingClientRect().height)}px`
+      );
+    };
+    setVar();
+    const observer = new ResizeObserver(setVar);
+    observer.observe(el);
+    window.addEventListener("orientationchange", setVar);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", setVar);
+      document.documentElement.style.removeProperty("--dock-total");
+    };
+  }, []);
 
   const {
     messages,
@@ -108,6 +132,7 @@ export function MapChatWidget() {
 
   return (
     <motion.div
+      ref={shellRef}
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 380, damping: 34, delay: 0.15 }}
@@ -131,10 +156,10 @@ export function MapChatWidget() {
       <motion.div
         layout
         className={cn(
-          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/90 shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300",
+          "map-ask-dock pointer-events-auto w-full max-w-[540px] overflow-hidden rounded-[26px] border bg-white/[0.96] shadow-[var(--shadow-dock)] backdrop-blur-2xl transition-shadow duration-300 dark:bg-[#0f1524]/[0.94]",
           focused
             ? "border-[#1e6b9c]/25 shadow-[var(--shadow-dock-focus)]"
-            : "border-white/70"
+            : "border-white/70 dark:border-white/10"
         )}
       >
         <LocalPromptBar
@@ -151,7 +176,7 @@ export function MapChatWidget() {
         />
 
         {showHistory && messages.length > 0 && (
-          <div className="max-h-[180px] space-y-2 overflow-y-auto border-t border-black/[0.05] px-4 py-3">
+          <div className="max-h-[180px] space-y-2 overflow-y-auto border-t border-black/[0.05] px-4 py-3 dark:border-white/10">
             {messages.map((m) => (
               <HistoryLine key={m.id} message={m} />
             ))}
@@ -159,34 +184,32 @@ export function MapChatWidget() {
         )}
 
         <AnimatePresence>
-          {agentError && !localMapAnswer && (
+          {agentError && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t border-amber-100/80 bg-amber-50/90 px-4 py-2.5"
+              className="overflow-hidden border-t border-amber-100/80 bg-amber-50/90 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-950/50"
             >
-              <p className="text-[12px] font-semibold text-amber-950">{agentErrorInfo.title}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-amber-900/75">
+              <p className="text-[12px] font-semibold text-amber-950 dark:text-amber-100">
+                {agentErrorInfo.title}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-amber-900/75 dark:text-amber-100/70">
                 {agentErrorInfo.detail}
               </p>
-              {agentErrorInfo.isRateLimited && agentErrorInfo.retryAfterMinutes && (
-                <p className="mt-1 text-[10px] text-amber-800/60">
-                  Usually resolves within {agentErrorInfo.retryAfterMinutes} min — no action needed.
+              {localMapAnswer && (
+                <p className="mt-1 text-[10px] text-amber-800/70 dark:text-amber-100/50">
+                  {agentErrorInfo.fallbackNote}
+                </p>
+              )}
+              {agentErrorInfo.isRateLimited && (
+                <p className="mt-1 text-[10px] text-amber-800/60 dark:text-amber-100/45">
+                  Next question will try a backup chat model when one is configured.
                 </p>
               )}
             </motion.div>
           )}
         </AnimatePresence>
-
-        {agentError && localMapAnswer && (
-          <div className="border-t border-black/[0.05] bg-[#f8f9fb] px-4 py-2">
-            <p className="text-[11px] text-[#5a6278]">
-              <span className="font-semibold text-[#3d4659]">{agentErrorInfo.title}.</span>{" "}
-              {agentErrorInfo.fallbackNote}
-            </p>
-          </div>
-        )}
 
         <form
           onSubmit={handleSubmit}
@@ -217,7 +240,8 @@ export function MapChatWidget() {
             readOnly={isLoading}
             rows={1}
             className={cn(
-              "map-ask-input max-h-[88px] min-h-[24px] w-full resize-none border-0 bg-transparent py-1 pr-11 text-[15px] leading-snug text-[#0c1222] shadow-none outline-none ring-0 placeholder:text-[#9aa3b5] focus:outline-none focus:ring-0 read-only:cursor-default read-only:opacity-60",
+              // text-base keeps iOS Safari from zooming the viewport on focus (<16px triggers auto-zoom)
+              "map-ask-input max-h-[88px] min-h-[24px] w-full resize-none border-0 bg-transparent py-1 pr-11 text-base leading-snug text-[#0c1222] shadow-none outline-none ring-0 placeholder:text-[#9aa3b5] focus:outline-none focus:ring-0 read-only:cursor-default read-only:opacity-60 sm:text-[15px]",
               messages.length > 0 ? "pl-9" : "pl-0.5"
             )}
           />

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAreaNewsBundle } from "@/services/clients/local-news";
-import { userAreaFromCountyId, buildUserArea, DEFAULT_USER_AREA } from "@/lib/user-area";
+import { userAreaFromCountyId, buildUserArea } from "@/lib/user-area";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(10, parseInt(searchParams.get("limit") ?? "6", 10) || 6);
   const developmentOnly = searchParams.get("development") === "1";
 
-  let area = DEFAULT_USER_AREA;
+  let area = countyId ? userAreaFromCountyId(countyId) : null;
 
   if (lat && lng) {
     const la = parseFloat(lat);
@@ -20,8 +20,18 @@ export async function GET(req: NextRequest) {
     if (Number.isFinite(la) && Number.isFinite(ln)) {
       area = buildUserArea({ lat: la, lng: ln }, "ip");
     }
-  } else if (countyId) {
-    area = userAreaFromCountyId(countyId);
+  }
+
+  if (!area) {
+    return NextResponse.json({
+      data: [],
+      sentiment: null,
+      mapPins: [],
+      bizJournalItems: [],
+      meta: { sources: [], gnewsConfigured: false, sentimentAvailable: false },
+      area: null,
+      hint: "Pass county or lat/lng — news is not defaulted to Milwaukee",
+    });
   }
 
   try {

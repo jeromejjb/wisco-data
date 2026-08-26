@@ -12,11 +12,11 @@ export function countyMetricValue(county: CountyEconomy, metric: ChoroplethMetri
     case "opportunity":
       return county.opportunityIndex;
     case "median-wage":
-      return county.medianWage;
+      return county.medianWage ?? 0;
     case "open-jobs":
-      return county.openJobs;
+      return county.openJobs ?? 0;
     case "transit-coverage":
-      return county.transitCoverage;
+      return county.transitCoverage ?? 0;
   }
 }
 
@@ -319,30 +319,41 @@ export function buildCountyFocus(
     },
     {
       label: "Median wage",
-      value: `$${Math.round(county.medianWage / 1000)}k`,
+      value: county.medianWage != null ? `$${Math.round(county.medianWage / 1000)}k` : "—",
       metricKey: "median-wage" as const,
     },
     {
       label: "Open jobs",
-      value: county.openJobs.toLocaleString(),
+      value: county.openJobs != null ? county.openJobs.toLocaleString() : "—",
       metricKey: "open-jobs" as const,
     },
-    {
-      label: "Transit reach",
-      value: `${Math.round(county.transitCoverage)}%`,
-      hint: `${Math.round(county.transitAccessibleJobShare)}% jobs on transit`,
-      metricKey: "transit-coverage" as const,
-    },
+    ...(county.transitCoverage != null
+      ? [
+          {
+            label: "Transit reach",
+            value: `${Math.round(county.transitCoverage)}%`,
+            hint:
+              county.transitAccessibleJobShare != null
+                ? `${Math.round(county.transitAccessibleJobShare)}% jobs on transit`
+                : undefined,
+            metricKey: "transit-coverage" as const,
+          },
+        ]
+      : []),
     {
       label: "Opportunity",
       value: String(county.opportunityIndex),
       metricKey: "opportunity" as const,
     },
-    {
-      label: "Labor force",
-      value: `${Math.round(county.laborForceParticipation)}%`,
-      metricKey: null,
-    },
+    ...(county.laborForceParticipation != null
+      ? [
+          {
+            label: "Labor force",
+            value: `${Math.round(county.laborForceParticipation)}%`,
+            metricKey: null,
+          },
+        ]
+      : []),
   ];
 
   return {

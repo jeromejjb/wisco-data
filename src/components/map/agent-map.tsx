@@ -171,7 +171,7 @@ export function AgentMap({
   defaultStyleId = "streets",
 }: AgentMapProps) {
   const immersive = immersiveProp ?? !!overlayMode;
-  const forceLightBasemap = immersive;
+  const forceLightBasemap = false;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersByIdRef = useRef(new globalThis.Map<string, MarkerEntry>());

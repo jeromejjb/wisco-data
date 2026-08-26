@@ -4,13 +4,24 @@ type CacheEntry<T> = {
   fetchedAt: number;
 };
 
+const MAX_ENTRIES = 400;
 const store = new Map<string, CacheEntry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
+
+function evictIfNeeded() {
+  if (store.size <= MAX_ENTRIES) return;
+  const extra = store.size - MAX_ENTRIES;
+  const oldest = [...store.entries()]
+    .sort((a, b) => a[1].fetchedAt - b[1].fetchedAt)
+    .slice(0, extra);
+  for (const [key] of oldest) store.delete(key);
+}
 
 export async function cached<T>(
   key: string,
   ttlMs: number,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options?: { shouldCache?: (value: T) => boolean }
 ): Promise<T> {
   const hit = store.get(key) as CacheEntry<T> | undefined;
   if (hit && Date.now() < hit.expiresAt) return hit.data;
@@ -20,7 +31,10 @@ export async function cached<T>(
 
   const promise = fn()
     .then((data) => {
-      store.set(key, { data, expiresAt: Date.now() + ttlMs, fetchedAt: Date.now() });
+      if (!options?.shouldCache || options.shouldCache(data)) {
+        store.set(key, { data, expiresAt: Date.now() + ttlMs, fetchedAt: Date.now() });
+        evictIfNeeded();
+      }
       return data;
     })
     .finally(() => {
@@ -64,3 +78,11 @@ export function getCacheKeyMeta(key: string) {
 export function listCacheKeys(): string[] {
   return [...store.keys()];
 }
+
+/** Test helper */
+export function resetCacheStore() {
+  store.clear();
+  inflight.clear();
+}
+
+export const CACHE_MAX_ENTRIES = MAX_ENTRIES;

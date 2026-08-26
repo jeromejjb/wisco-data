@@ -1,5 +1,5 @@
 import type { CountyEconomy, StatewideStats, DataProvenance } from "@/lib/types";
-import { WI_COUNTIES } from "@/lib/wi-counties";
+import { allCountyRecords } from "@/lib/county-lookup";
 import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
 import { cached } from "@/lib/cache";
 import { fetchBlsStatewideSnapshot, fetchBlsUnemploymentTrend } from "@/services/clients/bls";
@@ -17,7 +17,6 @@ function computeOpportunityIndex(input: {
   employment: number;
   avgWeeklyWage: number;
   wageGrowth: number | null;
-  laborForceParticipation?: number;
 }): number {
   const wageScore = Math.min(100, (input.avgWeeklyWage / 1400) * 40);
   const empScore = Math.min(30, (input.employment / 500000) * 30);
@@ -26,8 +25,14 @@ function computeOpportunityIndex(input: {
   return Math.round(wageScore + empScore + unempScore + growthScore);
 }
 
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T, label: string): T {
+  if (result.status === "fulfilled") return result.value;
+  console.warn(`Economy source failed (${label}):`, result.reason);
+  return fallback;
+}
+
 export async function getLiveEconomyData() {
-  return cached("economy:live", 3_600_000, fetchLiveEconomyData);
+  return cached("economy:live:v2", 3_600_000, fetchLiveEconomyData);
 }
 
 /** Fast path for home map — WisConomy + optional Census demographics. */
@@ -89,17 +94,45 @@ export async function getEconomyMapSeed() {
 }
 
 async function fetchLiveEconomyData() {
-  const [bls, qcewCounties, qcewState, wisconomy, industry, census, fredLfpr, trend] =
-    await Promise.all([
-      fetchBlsStatewideSnapshot(),
-      fetchQcewCounties(),
-      fetchQcewStatewide(),
-      fetchWisConomyCountyRates(),
-      fetchQcewIndustryBreakdown(),
-      fetchCensusCounties(),
-      fetchFredSeries("LBSSA55", 12),
-      fetchBlsUnemploymentTrend(),
-    ]);
+  const [
+    blsResult,
+    qcewCountiesResult,
+    qcewStateResult,
+    wisconomyResult,
+    industryResult,
+    censusResult,
+    fredLfprResult,
+    trendResult,
+  ] = await Promise.allSettled([
+    fetchBlsStatewideSnapshot(),
+    fetchQcewCounties(),
+    fetchQcewStatewide(),
+    fetchWisConomyCountyRates(),
+    fetchQcewIndustryBreakdown(),
+    fetchCensusCounties(),
+    fetchFredSeries("LBSSA55", 12),
+    fetchBlsUnemploymentTrend(),
+  ]);
+
+  const bls = settledValue(blsResult, {
+    unemploymentRate: null,
+    totalEmploymentThousands: null,
+    avgWeeklyWage: null,
+    medianWageEstimate: null,
+    latestPeriod: null,
+    fetchedAt: new Date().toISOString(),
+  }, "bls");
+  const qcewCounties = settledValue(qcewCountiesResult, [], "qcew-counties");
+  const qcewState = settledValue(qcewStateResult, null, "qcew-state");
+  const wisconomy = settledValue(
+    wisconomyResult,
+    { counties: [], fetchedAt: new Date().toISOString(), sourceUrl: "" },
+    "wisconomy"
+  );
+  const industry = settledValue(industryResult, [], "qcew-industry");
+  const census = settledValue(censusResult, null, "census");
+  const fredLfpr = settledValue(fredLfprResult, null, "fred");
+  const trend = settledValue(trendResult, [], "bls-trend");
 
   const wisconomyById = new Map(
     wisconomy.counties.filter((c) => c.countyId).map((c) => [c.countyId!, c])
@@ -109,65 +142,67 @@ async function fetchLiveEconomyData() {
     (census ?? []).map((c) => [c.name.toLowerCase(), c])
   );
 
-  const counties: CountyEconomy[] = WI_COUNTIES.map((county) => {
-    const q = qcewById.get(county.id);
+  const counties: CountyEconomy[] = [];
+  for (const county of allCountyRecords()) {
     const w = wisconomyById.get(county.id);
+    if (w == null || !Number.isFinite(w.unemploymentRate)) continue;
+
+    const q = qcewById.get(county.id);
     const censusRow = censusByName.get(county.name.toLowerCase());
+    const unemployment = w.unemploymentRate;
+    const employment = q?.employment;
+    const avgWeekly = q?.avgWeeklyWage;
+    const laborForce = w.laborForce || censusRow?.laborForce || 0;
+    const lfpr =
+      laborForce > 0 && censusRow?.population
+        ? (laborForce / censusRow.population) * 100
+        : undefined;
 
-    const unemployment = w?.unemploymentRate ?? 3.5;
-    const employment = q?.employment ?? 0;
-    const avgWeekly = q?.avgWeeklyWage ?? 1200;
-    const laborForce = w?.laborForce ?? censusRow?.laborForce ?? 0;
-    const employed = w?.employed ?? 0;
-    const lfpr = laborForce > 0 && censusRow?.population
-      ? (laborForce / censusRow.population) * 100
-      : employed > 0 && laborForce > 0
-        ? (laborForce / (employed * 1.05)) * 66
-        : 66;
-
-    return {
+    counties.push({
       id: county.id,
       name: county.name,
       fips: county.fips,
       coordinates: { lat: county.lat, lng: county.lng },
       population: censusRow?.population ?? undefined,
       unemploymentRate: Math.round(unemployment * 10) / 10,
-      laborForceParticipation: Math.round(Math.min(85, Math.max(55, lfpr)) * 10) / 10,
-      openJobs: Math.round(employment * 0.028),
-      medianWage: Math.round(avgWeekly * 52 * 0.92),
-      medianHouseholdIncome: censusRow?.medianHouseholdIncome ?? Math.round(avgWeekly * 52 * 1.1),
-      costOfLivingIndex: 95,
-      populationChange: 0.5,
-      transitCoverage: county.id === "milwaukee" ? 72 : county.id === "dane" ? 58 : 28,
-      transitAccessibleJobShare: county.id === "milwaukee" ? 41 : county.id === "dane" ? 38 : 20,
+      laborForceParticipation:
+        lfpr != null ? Math.round(Math.min(85, Math.max(45, lfpr)) * 10) / 10 : undefined,
+      openJobs: employment != null ? Math.round(employment * 0.028) : undefined,
+      medianWage: avgWeekly != null ? Math.round(avgWeekly * 52 * 0.92) : undefined,
+      medianHouseholdIncome: censusRow?.medianHouseholdIncome ?? undefined,
       opportunityIndex: computeOpportunityIndex({
         unemployment,
-        employment,
-        avgWeeklyWage: avgWeekly,
+        employment: employment ?? 0,
+        avgWeeklyWage: avgWeekly ?? 0,
         wageGrowth: q?.wageChangeYoY ?? null,
       }),
       industryGrowth: industry.slice(0, 3).map((i) => ({
         industry: i.name,
         growth: i.growth,
       })),
-    };
-  });
+    });
+  }
 
-  const statewideEmployment = qcewState?.employment ?? 2_950_000;
+  const countyUnempAvg =
+    counties.length > 0
+      ? counties.reduce((s, c) => s + c.unemploymentRate, 0) / counties.length
+      : undefined;
+  const statewideEmployment = qcewState?.employment;
   const laborForceParticipation = fredLfpr?.length
-    ? fredLfpr[fredLfpr.length - 1].value
-    : 66.8;
+    ? fredLfpr[fredLfpr.length - 1]!.value
+    : undefined;
 
   const statewide: StatewideStats = {
-    unemploymentRate: bls.unemploymentRate ?? 3.3,
-    laborForceParticipation: laborForceParticipation ?? 66.8,
-    openJobs: Math.round(statewideEmployment * 0.03),
-    medianWage: bls.medianWageEstimate ?? Math.round((qcewState?.avgWeeklyWage ?? 1278) * 52 * 0.92),
+    unemploymentRate: bls.unemploymentRate ?? countyUnempAvg,
+    laborForceParticipation,
+    openJobs: statewideEmployment != null ? Math.round(statewideEmployment * 0.03) : undefined,
+    medianWage: bls.medianWageEstimate ?? (qcewState?.avgWeeklyWage != null
+      ? Math.round(qcewState.avgWeeklyWage * 52 * 0.92)
+      : undefined),
     fastestGrowingIndustries: industry
       .sort((a, b) => b.growth - a.growth)
       .slice(0, 5)
       .map((i) => ({ name: i.name, growth: Math.round(i.growth * 10) / 10 })),
-    transitAccessibleJobShare: 34.6,
     provenance: buildProvenance(wisconomy.fetchedAt),
   };
 
@@ -192,9 +227,9 @@ async function fetchLiveEconomyData() {
     return {
       ...metro,
       unemploymentRate: county.unemploymentRate,
-      openJobs: county.openJobs,
-      medianWage: county.medianWage,
-      transitAccessibleShare: county.transitAccessibleJobShare,
+      openJobs: county.openJobs ?? metro.openJobs,
+      medianWage: county.medianWage ?? metro.medianWage,
+      transitAccessibleShare: county.transitAccessibleJobShare ?? metro.transitAccessibleShare,
       fastestGrowingIndustry: statewide.fastestGrowingIndustries[0]?.name ?? metro.fastestGrowingIndustry,
     };
   });
@@ -233,10 +268,10 @@ function buildProvenance(fetchedAt: string): DataProvenance {
   return {
     source: sources.join(" · "),
     lastUpdated: fetchedAt,
-    coverage: "Wisconsin statewide; featured counties with QCEW + LAUS",
+    coverage: "Wisconsin statewide — all 72 counties from WisConomy; QCEW where the feed responds",
     confidence: "high",
     methodology:
-      "State unemployment from BLS LAUS. County rates from WisConomy (DWD). Employment and wages from BLS QCEW Q4 2024. Open jobs estimated at ~3% of QCEW employment (JOLTS-style proxy).",
+      "State unemployment from BLS LAUS when available, otherwise the WisConomy county average. County rates from WisConomy (DWD). Employment and wages from BLS QCEW Q4 2024 when the county file loads. Open jobs estimated at ~3% of QCEW employment (JOLTS-style proxy) only when QCEW employment exists. Cost of living and transit coverage are omitted until a live source is wired.",
   };
 }
 

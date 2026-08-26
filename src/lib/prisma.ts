@@ -1,3 +1,4 @@
+/** Prisma client reserved for persisted saved places. Prompt experiments use the in-memory store. */
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };

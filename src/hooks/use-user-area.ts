@@ -86,11 +86,11 @@ export function useUserArea() {
         const res = await fetch("/api/location");
         if (res.ok) {
           const json = (await res.json()) as {
-            area: UserArea;
+            area: UserArea | null;
             meta: LocationMeta;
           };
           if (!cancelled) {
-            setDetectedArea(json.area);
+            if (json.area) setDetectedArea(json.area);
             setMeta(json.meta ?? {});
             setLoading(false);
           }
