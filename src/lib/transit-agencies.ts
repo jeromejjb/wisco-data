@@ -110,9 +110,14 @@ export function agencyByCounty(countyId: string): TransitAgencyConfig | undefine
 
 /** Map query intent metro slug → agency id */
 export function agencyIdFromMetro(
-  metro: "milwaukee" | "madison" | "both" | string | undefined
+  metro: "milwaukee" | "madison" | "green-bay" | "la-crosse" | "kenosha" | "appleton" | "eau-claire" | "both" | "all" | string | undefined
 ): TransitAgencyId | "all" {
   if (metro === "milwaukee") return "mcts";
   if (metro === "madison") return "madison";
+  if (metro === "green-bay") return "greenbay";
+  if (metro === "la-crosse") return "lacrosse";
+  if (metro === "kenosha") return "kenosha";
+  if (metro === "appleton") return "valley";
+  if (metro === "eau-claire") return "eauclaire";
   return "all";
 }

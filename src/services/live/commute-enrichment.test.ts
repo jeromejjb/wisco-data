@@ -6,7 +6,9 @@ vi.mock("@/services/clients/gtfs", () => ({
     stops:
       agencyId === "mcts"
         ? [{ lat: 43.0389, lng: -87.9065 }]
-        : [{ lat: 43.0731, lng: -89.4012 }],
+        : agencyId === "madison"
+          ? [{ lat: 43.0731, lng: -89.4012 }]
+          : [],
     routes: [],
   })),
 }));

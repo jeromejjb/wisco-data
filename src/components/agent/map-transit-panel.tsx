@@ -21,11 +21,10 @@ type MapTransitPanelProps = {
 
 export function MapTransitPanel({ metro }: MapTransitPanelProps) {
   const agency = agencyIdFromMetro(metro);
-  const fetchAgency = agency === "all" ? "mcts" : agency;
   const [selection, setSelection] = useState<TransitMapSelection | null>(null);
 
   const { data, isLoading } = useTransitMapData({
-    agency: fetchAgency,
+    agency,
     pollRealtime: true,
   });
 

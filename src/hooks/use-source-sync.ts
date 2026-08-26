@@ -22,7 +22,7 @@ export function useSourceSync(options?: {
   /** Delay first auto-refresh so cold load isn't competing with map paint */
   autoRefreshDelayMs?: number;
 }) {
-  const autoRefresh = options?.autoRefresh ?? true;
+  const autoRefresh = options?.autoRefresh ?? false;
   const pollMs = options?.pollMs ?? 120_000;
   const autoRefreshDelayMs = options?.autoRefreshDelayMs ?? 8_000;
   const refreshingRef = useRef(false);

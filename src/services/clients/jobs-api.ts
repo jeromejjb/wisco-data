@@ -18,9 +18,9 @@ function parseLocation(location: string): { city: string; lat: number; lng: numb
 
   const lower = location.toLowerCase();
   if (lower.includes("wisconsin") || lower.includes(", wi")) {
-    return { city: "Madison", lat: 43.0731, lng: -89.4012, county: "Dane" };
+    return { city: "Wisconsin", lat: 44.5, lng: -89.5, county: "Wisconsin" };
   }
-  return { city: "Milwaukee", lat: 43.0389, lng: -87.9065, county: "Milwaukee" };
+  return { city: "Wisconsin", lat: 44.5, lng: -89.5, county: "Wisconsin" };
 }
 
 export function parseJobSearchLocation(location: string) {
@@ -57,8 +57,10 @@ export async function fetchUsaJobsWisconsin(params?: {
   if (!key || !userAgent) return { jobs: [] as Job[], error: "USAJOBS_AUTH_KEY not configured" };
 
   const cacheKey = `usajobs:${params?.keyword ?? ""}:${params?.location ?? "Wisconsin"}:${params?.page ?? 1}`;
-
-  return cached(cacheKey, 30 * 60 * 1000, async () => {
+  return cached(
+    cacheKey,
+    30 * 60 * 1000,
+    async () => {
     try {
     const searchParams = new URLSearchParams({
       LocationName: params?.location ?? "Wisconsin",
@@ -118,7 +120,7 @@ export async function fetchUsaJobsWisconsin(params?: {
         schedule: d.PositionSchedule?.[0]?.Name ?? "Full-time",
         isOpen: true,
         applicationUrl: d.PositionURI,
-        transitAccessible: ["Milwaukee", "Madison"].includes(loc.city),
+        transitAccessible: false,
         commuteFitScore: undefined,
         employerRating: undefined,
       };
@@ -128,7 +130,9 @@ export async function fetchUsaJobsWisconsin(params?: {
     } catch (err) {
       return { jobs: [] as Job[], error: `USAJobs network: ${String(err)}` };
     }
-  });
+  },
+    { shouldCache: (r) => !r.error }
+  );
 }
 
 export async function fetchAdzunaJobs(params?: { keyword?: string; where?: string }) {
@@ -139,8 +143,10 @@ export async function fetchAdzunaJobs(params?: { keyword?: string; where?: strin
   const where = params?.where ?? "Wisconsin";
   const what = params?.keyword ?? "";
   const cacheKey = `adzuna:${what}:${where}`;
-
-  return cached(cacheKey, 30 * 60 * 1000, async () => {
+  return cached(
+    cacheKey,
+    30 * 60 * 1000,
+    async () => {
     try {
     const url = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/1`);
     url.searchParams.set("app_id", appId);
@@ -202,7 +208,7 @@ export async function fetchAdzunaJobs(params?: { keyword?: string; where?: strin
           schedule: "Varies",
           isOpen: true,
           applicationUrl: r.redirect_url,
-          transitAccessible: ["Milwaukee", "Madison"].includes(loc.city),
+          transitAccessible: false,
         };
       }
     );
@@ -211,5 +217,7 @@ export async function fetchAdzunaJobs(params?: { keyword?: string; where?: strin
     } catch (err) {
       return { jobs: [] as Job[], error: `Adzuna network: ${String(err)}` };
     }
-  });
+  },
+    { shouldCache: (r) => !r.error }
+  );
 }

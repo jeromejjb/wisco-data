@@ -42,6 +42,8 @@
   --ring: #4da3d4;
   --glow-lake: rgba(77, 163, 212, 0.12);
   --glow-forest: rgba(38, 122, 85, 0.1);
+  --shadow-dock: 0 12px 48px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-dock-focus: 0 16px 56px rgba(30, 107, 156, 0.28), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {

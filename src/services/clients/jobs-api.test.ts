@@ -23,8 +23,9 @@ describe("parseJobSearchLocation", () => {
     expect(loc.county).toBe("Milwaukee");
   });
 
-  it("falls back to Madison for generic statewide text", () => {
+  it("falls back to statewide coordinates for generic Wisconsin text", () => {
     const loc = parseJobSearchLocation("Wisconsin");
-    expect(loc.county).toBe("Dane");
+    expect(loc.county).toBe("Wisconsin");
+    expect(loc.city).toBe("Wisconsin");
   });
 });

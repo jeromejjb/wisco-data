@@ -104,14 +104,15 @@ export type CountyEconomy = {
   coordinates: Coordinates;
   population?: number;
   unemploymentRate: number;
-  laborForceParticipation: number;
-  openJobs: number;
-  medianWage: number;
-  medianHouseholdIncome: number;
-  costOfLivingIndex: number;
-  populationChange: number;
-  transitCoverage: number;
-  transitAccessibleJobShare: number;
+  laborForceParticipation?: number;
+  openJobs?: number;
+  medianWage?: number;
+  medianHouseholdIncome?: number;
+  /** Omitted unless a live source provides it — never a placeholder. */
+  costOfLivingIndex?: number;
+  populationChange?: number;
+  transitCoverage?: number;
+  transitAccessibleJobShare?: number;
   opportunityIndex: number;
   industryGrowth: { industry: string; growth: number }[];
 };
@@ -194,11 +195,11 @@ export type EconomyMetric =
   | "public-investment";
 
 export type StatewideStats = {
-  unemploymentRate: number;
-  laborForceParticipation: number;
-  openJobs: number;
-  medianWage: number;
+  unemploymentRate?: number;
+  laborForceParticipation?: number;
+  openJobs?: number;
+  medianWage?: number;
   fastestGrowingIndustries: { name: string; growth: number }[];
-  transitAccessibleJobShare: number;
+  transitAccessibleJobShare?: number;
   provenance: DataProvenance;
 };

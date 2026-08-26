@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { cached } from "@/lib/cache";
-import { WI_COUNTIES } from "@/lib/wi-counties";
+import { countyIdFromFips } from "@/lib/wi-counties";
+import { WI_COUNTY_NAME_TO_FIPS } from "@/lib/wi-county-fips";
 
 const COUNTY_RATES_URL =
   "https://jobcenterofwisconsin.com/wisconomy/wits_info/downloads/LAUS/uRatesCo.xls";
@@ -36,11 +37,11 @@ export async function fetchWisConomyCountyRates() {
       if (!row[0].includes("County")) continue;
 
       const name = row[0] as string;
-      const wiCounty = WI_COUNTIES.find((c) => c.name === name);
+      const fips = WI_COUNTY_NAME_TO_FIPS[name];
 
       counties.push({
         name,
-        countyId: wiCounty?.id,
+        countyId: fips ? countyIdFromFips(fips) : undefined,
         employed: Number(row[1]) || 0,
         laborForce: Number(row[2]) || 0,
         unemployed: Number(row[3]) || 0,

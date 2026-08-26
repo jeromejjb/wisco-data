@@ -17,6 +17,8 @@ export default function SavedPage() {
   const { data: jobsData } = useJobsData({});
   const [showAddPlace, setShowAddPlace] = useState(false);
   const [newPlace, setNewPlace] = useState({ name: "", address: "", type: "other" });
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const jobById = new Map((jobsData?.data ?? []).map((j) => [j.id, j]));
   const savedJobList = savedJobs
@@ -24,20 +26,32 @@ export default function SavedPage() {
     .filter(Boolean);
   const missingSavedIds = savedJobs.filter((id) => !jobById.has(id));
 
-  function handleAddPlace(e: React.FormEvent) {
+  async function handleAddPlace(e: React.FormEvent) {
     e.preventDefault();
     if (!newPlace.name || !newPlace.address) return;
-    const place: SavedPlace = {
-      id: `place-${Date.now()}`,
-      name: newPlace.name,
-      address: newPlace.address,
-      type: newPlace.type as SavedPlace["type"],
-      coordinates: { lat: 43.0389, lng: -87.9065 },
-      createdAt: new Date().toISOString(),
-    };
-    addSavedPlace(place);
-    setNewPlace({ name: "", address: "", type: "other" });
-    setShowAddPlace(false);
+    setSaving(true);
+    setGeoError(null);
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(newPlace.address)}`);
+      const json = await res.json();
+      if (!res.ok || !json.data) {
+        setGeoError(json.error ?? "Could not find that Wisconsin address.");
+        return;
+      }
+      const place: SavedPlace = {
+        id: `place-${Date.now()}`,
+        name: newPlace.name,
+        address: json.data.matchedAddress ?? newPlace.address,
+        type: newPlace.type as SavedPlace["type"],
+        coordinates: { lat: json.data.lat, lng: json.data.lng },
+        createdAt: new Date().toISOString(),
+      };
+      addSavedPlace(place);
+      setNewPlace({ name: "", address: "", type: "other" });
+      setShowAddPlace(false);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -98,7 +112,10 @@ export default function SavedPage() {
                 </Select>
               </div>
               <div className="sm:col-span-3">
-                <Button type="submit">Save place</Button>
+                {geoError && <p className="mb-2 text-sm text-danger">{geoError}</p>}
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Locating…" : "Save place"}
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -135,7 +152,7 @@ export default function SavedPage() {
                       </div>
                       <div className="flex gap-2">
                         <Link
-                          href={`/transit?job=${job.id}`}
+                          href={`/transit?dest=${encodeURIComponent(job.location.address || job.location.city)}`}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-muted"
                           aria-label="Plan trip"
                         >
