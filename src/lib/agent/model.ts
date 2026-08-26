@@ -132,6 +132,13 @@ export function getAgentModelCandidates(): AgentModelCandidate[] {
   const candidates: AgentModelCandidate[] = [resolveAgentModel()];
   const seen = new Set(candidates.map((c) => c.modelId));
 
+  // Different provider first — Gemini free-tier models often share one daily bucket,
+  // so hopping flash → flash-lite does not save a spent key. OpenAI can.
+  if (openaiCreds() && !seen.has("gpt-4o-mini")) {
+    seen.add("gpt-4o-mini");
+    candidates.push({ model: openai("gpt-4o-mini"), provider: "openai", modelId: "gpt-4o-mini" });
+  }
+
   if (googleCreds()) {
     for (const freeId of freeGoogleIds()) {
       if (!seen.has(freeId)) {
@@ -139,10 +146,6 @@ export function getAgentModelCandidates(): AgentModelCandidate[] {
         candidates.push({ model: google(freeId), provider: "google", modelId: freeId });
       }
     }
-  }
-  if (openaiCreds() && !seen.has("gpt-4o-mini")) {
-    seen.add("gpt-4o-mini");
-    candidates.push({ model: openai("gpt-4o-mini"), provider: "openai", modelId: "gpt-4o-mini" });
   }
   return candidates;
 }

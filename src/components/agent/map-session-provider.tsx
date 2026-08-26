@@ -187,7 +187,10 @@ export function MapSessionProvider({ children }: { children: ReactNode }) {
   );
   const loadingMessage = useRotatingMessage(isLoading ? gatheringMessages : [], 2800);
 
-  const agentErrorInfo = useMemo(() => formatAgentError(error), [error]);
+  const agentErrorInfo = useMemo(
+    () => formatAgentError(error, { liveFallback: Boolean(localMapAnswer) }),
+    [error, localMapAnswer]
+  );
 
   const onMapPainted = useCallback(() => {
     syncAnswerPin(question, displayAnswer, isLoading, area, loadingMessage);
