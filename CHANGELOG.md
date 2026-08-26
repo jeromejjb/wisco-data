@@ -22,7 +22,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Basemap no longer shows CARTO’s “API KEY REQUIRED” watermark; streets use Esri tiles that work without a key.
+- Basemap no longer shows CARTO’s “API KEY REQUIRED” watermark. Streets use CARTO Voyager when `NEXT_PUBLIC_CARTO_API_KEY` is set, otherwise Esri tiles that work without a key.
 - County selection, prompt carousel, and map camera moves settle faster so the map feels snappier.
 - When Firefox (or any browser) blocks WebGL, the map still draws as a 2D tile map instead of a dead-end error screen.
 - Ensure-PR job explains when GitHub Actions is blocked from opening pull requests, instead of dumping a Node stack trace.

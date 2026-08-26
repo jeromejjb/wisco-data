@@ -69,14 +69,18 @@ export function fitWisconsinCamera(map: FitBoundsMap, duration = 0) {
 export type MapStyleId = "streets" | "satellite" | "terrain";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() || "";
-const CARTO_API_KEY = process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim() || "";
 
 export function hasMapboxToken() {
   return MAPBOX_TOKEN.length > 0;
 }
 
+/** Read at call time so Next.js inlines NEXT_PUBLIC_ and tests can stub the env. */
+function cartoApiKey(): string {
+  return process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim() || "";
+}
+
 export function hasCartoApiKey() {
-  return CARTO_API_KEY.length > 0;
+  return cartoApiKey().length > 0;
 }
 
 /** Live satellite imagery available without Mapbox (Esri World Imagery). */
@@ -91,9 +95,11 @@ export function isSatelliteStyle(styleId: MapStyleId) {
 /** Preconnect targets for layout.tsx */
 export const MAP_TILE_ORIGINS = [
   "https://server.arcgisonline.com",
-  ...(CARTO_API_KEY
-    ? ["https://a.basemaps.cartocdn.com", "https://b.basemaps.cartocdn.com"]
-    : []),
+  "https://basemaps.cartocdn.com",
+  "https://a.basemaps.cartocdn.com",
+  "https://b.basemaps.cartocdn.com",
+  "https://c.basemaps.cartocdn.com",
+  "https://d.basemaps.cartocdn.com",
   "https://tile.opentopomap.org",
   "https://tiles.openfreemap.org",
   "https://api.mapbox.com",
@@ -134,13 +140,21 @@ export type RasterTileLayer = {
 };
 
 function cartoKeySuffix(): string {
-  return CARTO_API_KEY ? `?key=${encodeURIComponent(CARTO_API_KEY)}` : "";
+  const key = cartoApiKey();
+  return key ? `?key=${encodeURIComponent(key)}` : "";
+}
+
+/** MapLibre vector style — Voyager / Dark Matter with the CARTO key on the URL. */
+export function getCartoVectorStyleUrl(darkMode: boolean): string {
+  const q = cartoKeySuffix();
+  return darkMode
+    ? `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json${q}`
+    : `https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json${q}`;
 }
 
 /**
- * Streets raster tiles that do not require a key.
- * CARTO Voyager is used only when NEXT_PUBLIC_CARTO_API_KEY is set — without it,
- * cartocdn watermarks every tile with "API KEY REQUIRED".
+ * Streets raster tiles. CARTO Voyager when NEXT_PUBLIC_CARTO_API_KEY is set;
+ * otherwise Esri, so unauthenticated cartocdn cannot watermark the map.
  */
 export function streetRasterTiles(darkMode: boolean): RasterTileLayer {
   if (hasCartoApiKey()) {
@@ -150,10 +164,14 @@ export function streetRasterTiles(darkMode: boolean): RasterTileLayer {
       ? [
           `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
           `https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
         ]
       : [
           `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
           `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
         ];
     return {
       tiles,
@@ -161,7 +179,7 @@ export function streetRasterTiles(darkMode: boolean): RasterTileLayer {
         ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png${q}`
         : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png${q}`,
       attribution: CARTO_ATTRIBUTION,
-      subdomains: "ab",
+      subdomains: "abcd",
     };
   }
 
@@ -188,9 +206,11 @@ function dataRasterTiles(darkMode: boolean): RasterTileLayer {
         ];
     return {
       tiles,
-      url: tiles[0]!,
+      url: darkMode
+        ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`
+        : `https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
       attribution: CARTO_ATTRIBUTION,
-      subdomains: "ab",
+      subdomains: "abcd",
     };
   }
 
@@ -398,6 +418,10 @@ export function getMapStyleUrl(styleId: MapStyleId, darkMode: boolean): string {
     }
   }
 
+  if (styleId === "streets" && hasCartoApiKey()) {
+    return getCartoVectorStyleUrl(darkMode);
+  }
+
   if (styleId === "terrain") {
     return darkMode ? OPENFREEMAP_DARK : OPENFREEMAP_STREETS;
   }
@@ -421,7 +445,7 @@ export function getInitialMapStyle(
       return getTerrainMapStyle();
     case "streets":
     default:
-      // Raster streets — Esri (or CARTO Voyager when a key is set)
+      if (hasCartoApiKey()) return getCartoVectorStyleUrl(dark);
       return getVoyagerMapStyle(false);
   }
 }
@@ -431,10 +455,12 @@ export function resolveBasemapStyle(
   darkMode: boolean,
   options?: { forceLight?: boolean }
 ): StyleSpecification | string {
-  if (MAPBOX_TOKEN) return getMapStyleUrl(styleId, options?.forceLight ? false : darkMode);
+  const dark = options?.forceLight ? false : darkMode;
+  if (MAPBOX_TOKEN) return getMapStyleUrl(styleId, dark);
   if (styleId === "satellite") return getSatelliteMapStyle(false);
   if (styleId === "terrain") return getTerrainMapStyle();
-  return getRasterBasemapStyle(styleId, options?.forceLight ? false : darkMode);
+  if (hasCartoApiKey()) return getCartoVectorStyleUrl(dark);
+  return getRasterBasemapStyle(styleId, dark);
 }
 
 export function getMapStyle(styleId: MapStyleId, darkMode: boolean): string {

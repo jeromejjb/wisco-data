@@ -17,9 +17,7 @@ import { useAppStore } from "@/lib/store";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { mapFlyDurationMs } from "@/lib/motion";
 import {
-  getRasterBasemapStyle,
-  getMapStyleUrl,
-  hasMapboxToken,
+  resolveBasemapStyle,
   WISCONSIN_BOUNDS,
   WISCONSIN_CENTER,
 } from "@/lib/map-styles";
@@ -51,9 +49,7 @@ export default function RealMap({
   const reducedMotion = usePrefersReducedMotion();
   const [webglProbe, setWebglProbe] = useState<WebGL2Probe | null>(null);
 
-  const style = hasMapboxToken()
-    ? getMapStyleUrl("streets", darkMode)
-    : getRasterBasemapStyle("streets", darkMode);
+  const style = resolveBasemapStyle("streets", darkMode);
 
   const updateMarkers = useCallback(() => {
     markersRef.current.forEach((m) => m.remove());
@@ -198,9 +194,7 @@ export default function RealMap({
       skipStyleChangeRef.current = false;
       return;
     }
-    const next = hasMapboxToken()
-      ? getMapStyleUrl("streets", darkMode)
-      : getRasterBasemapStyle("streets", darkMode);
+    const next = resolveBasemapStyle("streets", darkMode);
     map.setStyle(next);
     map.once("idle", () => {
       void ensureCountyLayers(map);
