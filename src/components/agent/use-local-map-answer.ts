@@ -45,7 +45,7 @@ export function useLocalMapAnswer(
   status: string,
   error: Error | undefined,
   onApplied?: () => void,
-  area?: { displayName: string; countyId: string }
+  _area?: { displayName: string; countyId: string }
 ) {
   const applyActions = useMapStore((s) => s.applyActions);
   const setLocalMapAnswer = useMapStore((s) => s.setLocalMapAnswer);
@@ -87,7 +87,7 @@ export function useLocalMapAnswer(
 
     processedTurnRef.current = turnKey;
 
-    void buildLocalMapAnswer(intent, { area }).then((answer) => {
+    void buildLocalMapAnswer(intent).then((answer) => {
       if (!answer) return;
       setLocalMapAnswer(answer);
       if (answer.mapActions.length) {
@@ -98,7 +98,7 @@ export function useLocalMapAnswer(
       }
       onAppliedRef.current?.();
     });
-  }, [messages, status, error, applyActions, setLocalMapAnswer, area]);
+  }, [messages, status, error, applyActions, setLocalMapAnswer]);
 }
 
 /** @deprecated use useLocalMapAnswer */
