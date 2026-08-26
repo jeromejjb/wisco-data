@@ -85,7 +85,7 @@ export function DataGatheringLoader({
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.28, ease: "easeOut" }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
               className={cn("leading-snug", styles.text)}
             >
               {message}

@@ -23,6 +23,7 @@ import { WI_COUNTIES } from "@/lib/wi-counties";
 import type { CountyEconomy } from "@/lib/types";
 import { AnswerCard } from "./answer-panel-chrome";
 import { useMapSession } from "./map-session-provider";
+import { overlaySpring } from "@/lib/motion";
 
 const fetcher = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null));
 
@@ -155,10 +156,10 @@ export function MapCountyPanel({ className }: { className?: string }) {
       {selectedCounty && snapshot && (
         <motion.div
           key={selectedCounty.fips}
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 12 }}
-          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          exit={{ opacity: 0, y: 4 }}
+          transition={overlaySpring}
           role="region"
           aria-labelledby="county-panel-title"
           className={cn(
@@ -216,7 +217,7 @@ export function MapCountyPanel({ className }: { className?: string }) {
                 >
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 transition-transform duration-200",
+                      "h-4 w-4 transition-transform duration-150",
                       !bodyOpen && "-rotate-90"
                     )}
                   />

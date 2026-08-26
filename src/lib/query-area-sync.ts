@@ -55,7 +55,7 @@ export function applyQueryAreaSync(text: string): boolean {
       : 9;
 
   useMapStore.getState().applyActions([
-    { type: "flyTo", center: coords, zoom, pitch: 34 },
+    { type: "flyTo", center: coords, zoom, pitch: 12 },
     { type: "highlightCounties", countyIds: [area.countyId] },
   ]);
 

@@ -8,8 +8,8 @@ describe("mapFlyDurationMs", () => {
   });
 
   it("keeps camera moves within Material content-transition range", () => {
-    expect(mapFlyDurationMs(false, true)).toBeLessThanOrEqual(600);
-    expect(mapFlyDurationMs(false, false)).toBeLessThanOrEqual(800);
+    expect(mapFlyDurationMs(false, true)).toBeLessThanOrEqual(350);
+    expect(mapFlyDurationMs(false, false)).toBeLessThanOrEqual(400);
     expect(mapFlyDurationMs(false, false)).toBeGreaterThan(0);
   });
 });

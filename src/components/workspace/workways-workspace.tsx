@@ -59,7 +59,7 @@ function WorkspaceInner() {
         type: "flyTo",
         center: { lat: area.lat, lng: area.lng },
         zoom: 8.35,
-        pitch: 18,
+        pitch: 8,
       },
     ]);
   }, [area.countyId, area.lat, area.lng, area.source, areaLoading, applyActions]);

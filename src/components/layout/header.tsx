@@ -10,6 +10,7 @@ import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { LiveBadge } from "@/components/ui/live-badge";
 import { GlobalSearch } from "./global-search";
+import { overlaySpring } from "@/lib/motion";
 
 const navItems = [
   { href: "/explore", label: "Explore Economy" },
@@ -99,7 +100,7 @@ export function Header() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+            transition={overlaySpring}
             className="overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl lg:hidden"
             aria-label="Mobile"
           >
