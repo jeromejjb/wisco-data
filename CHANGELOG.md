@@ -22,6 +22,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- County boundaries and unemployment shading draw again. MapLibre's background worker was shipped without the file it imports, so every GeoJSON layer stalled on “loading”; the worker now loads from `public/maplibre/`.
 - Basemap no longer shows CARTO’s “API KEY REQUIRED” watermark. Streets use CARTO Voyager when `NEXT_PUBLIC_CARTO_API_KEY` is set, otherwise Esri tiles that work without a key.
 - County selection, prompt carousel, and map camera moves settle faster so the map feels snappier.
 - When Firefox (or any browser) blocks WebGL, the map still draws as a 2D tile map instead of a dead-end error screen.
