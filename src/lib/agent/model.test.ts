@@ -96,6 +96,14 @@ describe("resolveAgentModelFallback", () => {
     const ids = getAgentModelCandidates().map((c) => c.modelId);
     expect(ids[0]).toBe("gemini-2.5-flash");
     expect(ids).toContain("gemini-2.5-flash-lite");
-    expect(ids).toContain("gemini-2.0-flash-lite");
+    expect(ids.some((id) => id.startsWith("gemini-2.0"))).toBe(false);
+  });
+});
+
+describe("retired models", () => {
+  it("treats a retired Gemini model as skippable", async () => {
+    const { isModelUnavailableError } = await import("./model");
+    expect(isModelUnavailableError("models/gemini-2.0-flash is not found for API version v1beta (404)")).toBe(true);
+    expect(isModelUnavailableError("Invalid API key")).toBe(false);
   });
 });

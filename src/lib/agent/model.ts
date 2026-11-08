@@ -12,13 +12,15 @@ export type AgentModelCandidate = {
   modelId: string;
 };
 
-/** Free Gemini models with separate quota buckets — lite first so failover stays fast. */
-export const FREE_GOOGLE_MODELS = [
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-2.5-flash",
-] as const;
+/**
+ * Free-tier Gemini models, highest daily quota first (Flash-Lite ≈1,000 req/day vs
+ * Flash ≈250 on the free tier). Gemini 2.0 Flash / Flash-Lite were shut down
+ * June 1, 2026 — keep them out or failover dead-ends on "model not found".
+ */
+export const FREE_GOOGLE_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"] as const;
+
+/** Default Google model: the free tier's highest daily quota, so a public site stays up. */
+export const DEFAULT_GOOGLE_MODEL = FREE_GOOGLE_MODELS[0];
 
 export function resolveAgentModel(): AgentModelCandidate {
   const googleKey =
@@ -30,7 +32,7 @@ export function resolveAgentModel(): AgentModelCandidate {
   const modelOverride = process.env.AGENT_MODEL?.trim();
 
   if ((preferred === "google" || !preferred) && googleKey) {
-    const modelId = modelOverride || "gemini-2.5-flash";
+    const modelId = modelOverride || DEFAULT_GOOGLE_MODEL;
     return { model: google(modelId), provider: "google", modelId };
   }
 
@@ -40,12 +42,12 @@ export function resolveAgentModel(): AgentModelCandidate {
   }
 
   if (googleKey) {
-    const modelId = modelOverride || "gemini-2.5-flash";
+    const modelId = modelOverride || DEFAULT_GOOGLE_MODEL;
     return { model: google(modelId), provider: "google", modelId };
   }
 
   // Vercel AI Gateway fallback (requires AI_GATEWAY_API_KEY)
-  const gatewayModel = modelOverride || "google/gemini-2.5-flash";
+  const gatewayModel = modelOverride || `google/${DEFAULT_GOOGLE_MODEL}`;
   return { model: gatewayModel, provider: "gateway", modelId: gatewayModel };
 }
 
@@ -164,8 +166,25 @@ function asV3(model: LanguageModel): LanguageModelV3 | null {
   return null;
 }
 
+/** Retired or unknown model id — skip it for a day rather than failing the chat. */
+export function isModelUnavailableError(raw: string): boolean {
+  const lower = raw.toLowerCase();
+  return (
+    lower.includes("not found") ||
+    lower.includes("not_found") ||
+    lower.includes("is not supported") ||
+    lower.includes("deprecated") ||
+    lower.includes("no longer available") ||
+    /\b404\b/.test(lower)
+  );
+}
+
+/** Marks the model as cooling and returns true when the next free model should be tried. */
 function coolIfQuota(modelId: string, error: unknown): boolean {
-  const until = failureCooldownFromRaw(rawErrorText(error));
+  const raw = rawErrorText(error);
+  const until =
+    failureCooldownFromRaw(raw) ??
+    (isModelUnavailableError(raw) ? Date.now() + 24 * 60 * 60_000 : null);
   if (until === null) return false;
   markModelCooldown(modelId, until);
   return true;
