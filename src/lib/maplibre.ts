@@ -5,9 +5,20 @@ import {
   NavigationControl,
   ScaleControl,
   GeolocateControl,
+  getVersion,
+  setWorkerUrl,
 } from "maplibre-gl";
 import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import { MAP_WEBGL_ATTRIBUTES } from "@/lib/webgl-support";
+
+/**
+ * MapLibre 6's default worker URL is emitted by Turbopack without its
+ * `maplibre-gl-shared.mjs` sibling, so the worker 404s and GeoJSON layers
+ * (counties, unemployment, routes) never render. Serve both files from
+ * `public/` instead — see scripts/copy-maplibre-worker.mjs.
+ */
+export const MAPLIBRE_WORKER_PATH = `/maplibre/${getVersion()}/maplibre-gl-worker.mjs`;
+setWorkerUrl(MAPLIBRE_WORKER_PATH);
 
 export {
   Map,

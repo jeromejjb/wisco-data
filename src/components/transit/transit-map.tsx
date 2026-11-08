@@ -19,9 +19,7 @@ import { mapFlyDurationMs } from "@/lib/motion";
 import { RasterFallbackMap } from "@/components/map/raster-fallback-map";
 import { isGpuInitializationError, probeWebGL2, type WebGL2Probe } from "@/lib/webgl-support";
 import {
-  getRasterBasemapStyle,
-  getMapStyleUrl,
-  hasMapboxToken,
+  resolveBasemapStyle,
   WISCONSIN_BOUNDS,
 } from "@/lib/map-styles";
 import type {
@@ -109,9 +107,7 @@ export function TransitMap({
   const reducedMotion = usePrefersReducedMotion();
   const [webglProbe, setWebglProbe] = useState<WebGL2Probe | null>(null);
 
-  const style = hasMapboxToken()
-    ? getMapStyleUrl("streets", darkMode)
-    : getRasterBasemapStyle("streets", darkMode);
+  const style = resolveBasemapStyle("streets", darkMode);
 
   const syncRouteLayer = useCallback(
     (map: MapLibreMap) => {
@@ -309,9 +305,7 @@ export function TransitMap({
       skipStyleChangeRef.current = false;
       return;
     }
-    const next = hasMapboxToken()
-      ? getMapStyleUrl("streets", darkMode)
-      : getRasterBasemapStyle("streets", darkMode);
+    const next = resolveBasemapStyle("streets", darkMode);
     map.setStyle(next);
     map.once("idle", () => {
       syncRouteLayer(map);

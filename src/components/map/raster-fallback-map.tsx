@@ -17,6 +17,7 @@ import {
 import {
   WISCONSIN_BOUNDS,
   WISCONSIN_FIT_BOUNDS,
+  streetRasterTiles,
   type MapStyleId,
 } from "@/lib/map-styles";
 import { toneColor } from "@/lib/news-geo";
@@ -30,7 +31,10 @@ type RasterFallbackMapProps = {
 
 type LeafletNS = typeof import("leaflet");
 
-function tileForStyle(styleId: MapStyleId, darkMode: boolean) {
+function tileForStyle(
+  styleId: MapStyleId,
+  darkMode: boolean
+): { url: string; attribution: string; subdomains?: string } {
   if (styleId === "satellite") {
     return {
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -43,15 +47,7 @@ function tileForStyle(styleId: MapStyleId, darkMode: boolean) {
       attribution: "© OpenTopoMap © OpenStreetMap",
     };
   }
-  return darkMode
-    ? {
-        url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        attribution: "© CARTO © OpenStreetMap",
-      }
-    : {
-        url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
-        attribution: "© CARTO © OpenStreetMap",
-      };
+  return streetRasterTiles(darkMode);
 }
 
 function fitWisconsin(L: LeafletNS, map: LeafletMap) {
@@ -131,7 +127,7 @@ export function RasterFallbackMap({
       const tile = tileForStyle(mapStyleId, darkMode);
       tilesRef.current = L.tileLayer(tile.url, {
         attribution: tile.attribution,
-        subdomains: "ab",
+        ...(tile.subdomains ? { subdomains: tile.subdomains } : {}),
       }).addTo(map);
 
       fitWisconsin(L, map);
@@ -214,7 +210,7 @@ export function RasterFallbackMap({
     const tile = tileForStyle(mapStyleId, darkMode);
     tilesRef.current = L.tileLayer(tile.url, {
       attribution: tile.attribution,
-      subdomains: "ab",
+      ...(tile.subdomains ? { subdomains: tile.subdomains } : {}),
     }).addTo(map);
     tilesRef.current.bringToBack();
   }, [mapStyleId, darkMode, ready]);

@@ -74,6 +74,15 @@ export function hasMapboxToken() {
   return MAPBOX_TOKEN.length > 0;
 }
 
+/** Read at call time so Next.js inlines NEXT_PUBLIC_ and tests can stub the env. */
+function cartoApiKey(): string {
+  return process.env.NEXT_PUBLIC_CARTO_API_KEY?.trim() || "";
+}
+
+export function hasCartoApiKey() {
+  return cartoApiKey().length > 0;
+}
+
 /** Live satellite imagery available without Mapbox (Esri World Imagery). */
 export function hasSatelliteBasemap() {
   return true;
@@ -86,8 +95,11 @@ export function isSatelliteStyle(styleId: MapStyleId) {
 /** Preconnect targets for layout.tsx */
 export const MAP_TILE_ORIGINS = [
   "https://server.arcgisonline.com",
+  "https://basemaps.cartocdn.com",
   "https://a.basemaps.cartocdn.com",
   "https://b.basemaps.cartocdn.com",
+  "https://c.basemaps.cartocdn.com",
+  "https://d.basemaps.cartocdn.com",
   "https://tile.opentopomap.org",
   "https://tiles.openfreemap.org",
   "https://api.mapbox.com",
@@ -107,25 +119,116 @@ const ESRI_LABELS =
 const ESRI_TRANSPORT =
   "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}";
 
+const ESRI_STREETS =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+
+const ESRI_DARK =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+
+const ESRI_LIGHT_GRAY =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+
+const OSM_ATTRIBUTION = "© OpenStreetMap contributors";
+const ESRI_ATTRIBUTION = `© Esri ${OSM_ATTRIBUTION}`;
+const CARTO_ATTRIBUTION = `© CARTO ${OSM_ATTRIBUTION}`;
+
+export type RasterTileLayer = {
+  tiles: string[];
+  url: string;
+  attribution: string;
+  subdomains?: string;
+};
+
+function cartoKeySuffix(): string {
+  const key = cartoApiKey();
+  return key ? `?key=${encodeURIComponent(key)}` : "";
+}
+
+/** MapLibre vector style — Voyager / Dark Matter with the CARTO key on the URL. */
+export function getCartoVectorStyleUrl(darkMode: boolean): string {
+  const q = cartoKeySuffix();
+  return darkMode
+    ? `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json${q}`
+    : `https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json${q}`;
+}
+
+/**
+ * Streets raster tiles. CARTO Voyager when NEXT_PUBLIC_CARTO_API_KEY is set;
+ * otherwise Esri, so unauthenticated cartocdn cannot watermark the map.
+ */
+export function streetRasterTiles(darkMode: boolean): RasterTileLayer {
+  if (hasCartoApiKey()) {
+    const scale = rasterTileScale();
+    const q = cartoKeySuffix();
+    const tiles = darkMode
+      ? [
+          `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+          `https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png${q}`,
+        ]
+      : [
+          `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+          `https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png${q}`,
+        ];
+    return {
+      tiles,
+      url: darkMode
+        ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png${q}`
+        : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png${q}`,
+      attribution: CARTO_ATTRIBUTION,
+      subdomains: "abcd",
+    };
+  }
+
+  const url = darkMode ? ESRI_DARK : ESRI_STREETS;
+  return {
+    tiles: [url],
+    url,
+    attribution: ESRI_ATTRIBUTION,
+  };
+}
+
+function dataRasterTiles(darkMode: boolean): RasterTileLayer {
+  if (hasCartoApiKey()) {
+    const scale = rasterTileScale();
+    const q = cartoKeySuffix();
+    const tiles = darkMode
+      ? [
+          `https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+        ]
+      : [
+          `https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+          `https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+        ];
+    return {
+      tiles,
+      url: darkMode
+        ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png${q}`
+        : `https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png${q}`,
+      attribution: CARTO_ATTRIBUTION,
+      subdomains: "abcd",
+    };
+  }
+
+  const url = darkMode ? ESRI_DARK : ESRI_LIGHT_GRAY;
+  return {
+    tiles: [url],
+    url,
+    attribution: ESRI_ATTRIBUTION,
+  };
+}
+
 function clampRaster(n: number, min = -1, max = 1) {
   return Math.min(max, Math.max(min, n));
 }
 
-function voyagerTileUrls(darkMode: boolean): string[] {
-  const scale = rasterTileScale();
-  return darkMode
-    ? [
-        `https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}${scale}.png`,
-      ]
-    : [
-        `https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}${scale}.png`,
-      ];
-}
-
 /** Live satellite + colorful map wash + labels */
 export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
+  const wash = streetRasterTiles(darkMode);
   return {
     version: 8,
     name: "workways-satellite",
@@ -140,10 +243,10 @@ export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
       },
       colorWash: {
         type: "raster",
-        tiles: voyagerTileUrls(darkMode),
+        tiles: wash.tiles,
         tileSize: 256,
         maxzoom: 22,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: wash.attribution,
       },
       labels: {
         type: "raster",
@@ -196,9 +299,9 @@ export function getSatelliteMapStyle(darkMode: boolean): StyleSpecification {
   };
 }
 
-/** Colorful CARTO Voyager — bold land use & water colors */
+/** Colorful streets raster — Esri World Topo, or CARTO Voyager when a key is set */
 export function getVoyagerMapStyle(darkMode: boolean): StyleSpecification {
-  const tiles = voyagerTileUrls(darkMode);
+  const layer = streetRasterTiles(darkMode);
 
   return {
     version: 8,
@@ -206,9 +309,9 @@ export function getVoyagerMapStyle(darkMode: boolean): StyleSpecification {
     sources: {
       basemap: {
         type: "raster",
-        tiles,
+        tiles: layer.tiles,
         tileSize: 256,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: layer.attribution,
       },
     },
     layers: [
@@ -259,16 +362,7 @@ export function getTerrainMapStyle(): StyleSpecification {
 
 /** Clean minimal basemap for secondary pages */
 export function getDataMapStyle(darkMode: boolean): StyleSpecification {
-  const scale = rasterTileScale();
-  const tiles = darkMode
-    ? [
-        `https://a.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}${scale}.png`,
-      ]
-    : [
-        `https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png`,
-        `https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}${scale}.png`,
-      ];
+  const layer = dataRasterTiles(darkMode);
 
   return {
     version: 8,
@@ -276,9 +370,9 @@ export function getDataMapStyle(darkMode: boolean): StyleSpecification {
     sources: {
       basemap: {
         type: "raster",
-        tiles,
+        tiles: layer.tiles,
         tileSize: 256,
-        attribution: "© CARTO © OpenStreetMap",
+        attribution: layer.attribution,
       },
     },
     layers: [{ id: "basemap", type: "raster", source: "basemap", minzoom: 0, maxzoom: 22 }],
@@ -324,6 +418,10 @@ export function getMapStyleUrl(styleId: MapStyleId, darkMode: boolean): string {
     }
   }
 
+  if (styleId === "streets" && hasCartoApiKey()) {
+    return getCartoVectorStyleUrl(darkMode);
+  }
+
   if (styleId === "terrain") {
     return darkMode ? OPENFREEMAP_DARK : OPENFREEMAP_STREETS;
   }
@@ -347,7 +445,7 @@ export function getInitialMapStyle(
       return getTerrainMapStyle();
     case "streets":
     default:
-      // CARTO Voyager raster — vivid, reliable, reads instantly as a map
+      if (hasCartoApiKey()) return getCartoVectorStyleUrl(dark);
       return getVoyagerMapStyle(false);
   }
 }
@@ -357,10 +455,12 @@ export function resolveBasemapStyle(
   darkMode: boolean,
   options?: { forceLight?: boolean }
 ): StyleSpecification | string {
-  if (MAPBOX_TOKEN) return getMapStyleUrl(styleId, options?.forceLight ? false : darkMode);
+  const dark = options?.forceLight ? false : darkMode;
+  if (MAPBOX_TOKEN) return getMapStyleUrl(styleId, dark);
   if (styleId === "satellite") return getSatelliteMapStyle(false);
   if (styleId === "terrain") return getTerrainMapStyle();
-  return getRasterBasemapStyle(styleId, options?.forceLight ? false : darkMode);
+  if (hasCartoApiKey()) return getCartoVectorStyleUrl(dark);
+  return getRasterBasemapStyle(styleId, dark);
 }
 
 export function getMapStyle(styleId: MapStyleId, darkMode: boolean): string {
